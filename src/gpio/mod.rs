@@ -53,13 +53,6 @@ pub unsafe fn gpio_set_pin_mode(port: GpioPort, pin: u8, mode: PinMode) {
     write_volatile(moder_addr, new_moder);
 }
 
-pub unsafe fn gpio_read_pin_mode(port: GpioPort) -> u32 {
-    let base_addr = GPIO_BASE_ADDRS[port as usize];
-    let moder_addr = base_addr as *mut u32;
-    
-    read_volatile(moder_addr)
-}
-
 pub unsafe fn gpio_set_pin(port: GpioPort, pin: u8, set_value: bool) {
     let base_addr = GPIO_BASE_ADDRS[port as usize];
     let bsrr_addr = (base_addr + 0x18) as *mut u32;
