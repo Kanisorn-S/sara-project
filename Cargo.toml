@@ -11,6 +11,7 @@ defmt = "1.0.1"
 defmt-rtt = "1.0.0"
 stm32h7xx-hal = { version = "0.16.0", features = ["stm32h743v", "rt"] }
 panic-halt = "1.0.0"
+ufmt = "0.2.0"
 
 [profile.dev]
 opt-level = 's'

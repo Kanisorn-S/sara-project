@@ -1,17 +1,20 @@
-#![no_std]
-#![no_main]
-
+#![no_std] #![no_main]
 mod gpio;
 mod timer;
 mod adc;
+mod uart;
 
 use cortex_m::asm::nop;
 use cortex_m_rt::entry;
-use stm32h7xx_hal as _;
 use panic_halt as _;
 use crate::adc::{adc_calibrate, adc_configure_single_conversion, adc_enable, adc_power_up, adc_preselect_channel, adc_read_value, adc_start_conversion, adc_wait_for_conversion, rcc_enable_adc_clock};
 use crate::gpio::{gpio_set_pin, gpio_set_pin_mode, gpio_toggle_pin, rcc_enable_gpio_clock, GpioPort, PinMode};
+use stm32h7xx_hal as _;
+use crate::gpio::{gpio_set_alternate_function, gpio_set_pin_mode, gpio_toggle_pin, rcc_enable_gpio_clock, GpioPort, PinMode};
+use crate::gpio::AlternateFunction::{AF6, AF7};
 use crate::timer::delay;
+use crate::uart::{rcc_enable_uart1_clock, rcc_enable_uart4_clock, Uart};
+
 
 #[entry]
 fn main() -> ! {
@@ -20,7 +23,21 @@ fn main() -> ! {
     const ADC_PIN_PORT: GpioPort = GpioPort::A;
     const ADC_PIN: u8 = 0;
     const ADC_CHANNEL: u32 = 16;
-    
+
+    const UART1_BASE_ADDR: u32 = 0x4001_1000;
+    const UART1_GPIO_PORT: GpioPort = GpioPort::A;
+    const UART1_TX_PIN: u8 = 9;
+    const UART1_RX_PIN: u8 = 10;
+
+    // const UART4_BASE_ADDR: u32 = 0x4000_4C00;
+    // const UART4_GPIO_PORT: GpioPort = GpioPort::A;
+    // const UART4_RX_PIN: u8 = 11;
+    // const UART4_TX_PIN: u8 = 12;
+
+    let uart1 = Uart::new(UART1_BASE_ADDR);
+    // let uart4 = Uart::new(UART4_BASE_ADDR);
+
+
     unsafe {
         rcc_enable_gpio_clock(LED_PIN_PORT);
         gpio_set_pin_mode(LED_PIN_PORT, LED_PIN, PinMode::OUTPUT);
@@ -35,8 +52,29 @@ fn main() -> ! {
         adc_enable();
         adc_configure_single_conversion(ADC_CHANNEL);
         adc_preselect_channel(ADC_CHANNEL);
+
+        rcc_enable_gpio_clock(UART1_GPIO_PORT);
+        gpio_set_pin_mode(UART1_GPIO_PORT, UART1_RX_PIN, PinMode::ALTERNATE);
+        gpio_set_pin_mode(UART1_GPIO_PORT, UART1_TX_PIN, PinMode::ALTERNATE);
+        // rcc_enable_gpio_clock(UART4_GPIO_PORT);
+        // gpio_set_pin_mode(UART4_GPIO_PORT, UART4_RX_PIN, PinMode::ALTERNATE);
+        // gpio_set_pin_mode(UART4_GPIO_PORT, UART4_TX_PIN, PinMode::ALTERNATE);
+
+        gpio_set_alternate_function(UART1_GPIO_PORT, UART1_RX_PIN, AF7);
+        gpio_set_alternate_function(UART1_GPIO_PORT, UART1_TX_PIN, AF7);
+        // gpio_set_alternate_function(UART4_GPIO_PORT, UART4_RX_PIN, AF6);
+        // gpio_set_alternate_function(UART4_GPIO_PORT, UART4_TX_PIN, AF6);
+
+        rcc_enable_uart1_clock();
+        // rcc_enable_uart4_clock();
+
+        uart1.init(115200);
+        // uart4.init(115200);
+
     }
-    
+
+    let mut counter: u32 = 0;
+
     loop {
         let adc_value: u32;
         unsafe {
@@ -49,6 +87,6 @@ fn main() -> ! {
         }
 
         nop();
-        delay(100_000);
+        delay(400_000);
     }
 }
