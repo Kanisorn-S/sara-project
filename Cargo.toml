@@ -5,13 +5,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cortex-m = { version = "0.7.7", features = ["critical-section-single-core"]}
+cortex-m = "0.7.7"
 cortex-m-rt = "0.7.5"
 defmt = "1.0.1"
 defmt-rtt = "1.0.0"
-stm32h7xx-hal = { version = "0.16.0", features = ["stm32h743v", "rt"] }
-panic-halt = "1.0.0"
 ufmt = "0.2.0"
+stm32h7xx-hal = { version = "0.16.0", features = ["stm32h743v", "rt", "fmc"] }
+panic-halt = "1.0.0"
+st7735-lcd = "0.10.0"
 
 [profile.dev]
 opt-level = 's'
