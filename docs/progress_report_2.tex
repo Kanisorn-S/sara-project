@@ -20,7 +20,7 @@
 \title{Sensors and Actuators for Robotics and
 Automation\\Term Project Progress Report II}
 \author{Kanisorn Sangchai (ID: 6538020621)}
-\date{December 6, 2025}
+\date{October 6, 2025}
 
 \begin{document}
 
@@ -168,7 +168,7 @@ In addition, the common ADC registers are accessed at \textbf{ADC common base ad
     \end{itemize}
 \end{itemize}
 
-To initialize the clock for USART1, we need to access and modify RCC registers. The following registers are accessed relative to \textbf{base\_addr} of RCC which is \textbf{0x58024400}~\cite[pp.~132]{ref-manual}:
+To initialize the clock for ADC, we need to access and modify RCC registers. The following registers are accessed relative to \textbf{base\_addr} of RCC which is \textbf{0x58024400}~\cite[pp.~132]{ref-manual}:
 
 \begin{itemize}
     \item \textbf{AHB1ENR (offset 0xD8)}~\cite[pp.~467]{ref-manual}: Enables the ADC12 peripheral clock.
