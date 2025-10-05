@@ -1,37 +1,110 @@
 #![deny(warnings)]
-#![no_main]
 #![no_std]
+#![no_main]
+
+use core::mem::MaybeUninit;
 
 use cortex_m_rt::entry;
-use stm32h7xx_hal::{pac, prelude::*};
-use panic_halt as _;
+
+use stm32h7xx_hal::rcc::rec::UsbClkSel;
+use stm32h7xx_hal::usb_hs::{UsbBus, USB2};
+use stm32h7xx_hal::{prelude::*, stm32};
+use usb_device::prelude::*;
+
+static mut EP_MEMORY: MaybeUninit<[u32; 1024]> = MaybeUninit::uninit();
 
 #[entry]
 fn main() -> ! {
-    let cp = cortex_m::Peripherals::take().unwrap();
-    let dp = pac::Peripherals::take().unwrap();
+    let dp = stm32::Peripherals::take().unwrap();
 
-    // Constrain and Freeze power
+    // Power
     let pwr = dp.PWR.constrain();
-    let pwrcfg = pwr.freeze();
+    let vos = pwr.freeze();
 
-    // Constrain and Freeze clock
+    // RCC
     let rcc = dp.RCC.constrain();
-    let ccdr = rcc.sys_ck(100.MHz()).freeze(pwrcfg, &dp.SYSCFG);
+    let mut ccdr = rcc.sys_ck(80.MHz()).freeze(vos, &dp.SYSCFG);
 
-    let gpioe = dp.GPIOE.split(ccdr.peripheral.GPIOE);
+    // 48MHz CLOCK
+    let _ = ccdr.clocks.hsi48_ck().expect("HSI48 must run");
+    ccdr.peripheral.kernel_usb_clk_mux(UsbClkSel::Hsi48);
 
-    let mut led = gpioe.pe3.into_push_pull_output();
-
-    let mut delay = cp.SYST.delay(ccdr.clocks);
-
-    loop {
-        led.set_high();
-        delay.delay_ms(500_u16);
-
-        led.set_low();
-        delay.delay_ms(500_u16);
+    // If your hardware uses the internal USB voltage regulator in ON mode, you
+    // should uncomment this block.
+    unsafe {
+        let pwr = &*stm32::PWR::ptr();
+        pwr.cr3.modify(|_, w| w.usbregen().set_bit());
+        while pwr.cr3.read().usb33rdy().bit_is_clear() {}
     }
 
+    // IO
+    let (pin_dm, pin_dp) = {
+        let gpioa = dp.GPIOA.split(ccdr.peripheral.GPIOA);
+        (gpioa.pa11.into_alternate(), gpioa.pa12.into_alternate())
+    };
 
+    let usb = USB2::new(
+        dp.OTG2_HS_GLOBAL,
+        dp.OTG2_HS_DEVICE,
+        dp.OTG2_HS_PWRCLK,
+        pin_dm,
+        pin_dp,
+        ccdr.peripheral.USB2OTG,
+        &ccdr.clocks,
+    );
+
+    // Initialise EP_MEMORY to zero
+    unsafe {
+        let buf: &mut [MaybeUninit<u32>; 1024] =
+            &mut *(core::ptr::addr_of_mut!(EP_MEMORY) as *mut _);
+        for value in buf.iter_mut() {
+            value.as_mut_ptr().write(0);
+        }
+    }
+
+    // Now we may assume that EP_MEMORY is initialised
+    #[allow(static_mut_refs)] // TODO: Fix this
+    let usb_bus = UsbBus::new(usb, unsafe { EP_MEMORY.assume_init_mut() });
+
+    let mut serial = usbd_serial::SerialPort::new(&usb_bus);
+
+    let mut usb_dev =
+        UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
+            .strings(&[usb_device::device::StringDescriptors::default()
+                .manufacturer("Fake company")
+                .product("Serial port")
+                .serial_number("TEST PORT 1")])
+            .unwrap()
+            .device_class(usbd_serial::USB_CLASS_CDC)
+            .build();
+
+    loop {
+        if !usb_dev.poll(&mut [&mut serial]) {
+            continue;
+        }
+
+        let mut buf = [0u8; 64];
+
+        match serial.read(&mut buf) {
+            Ok(count) if count > 0 => {
+                // Echo back in upper case
+                for c in buf[0..count].iter_mut() {
+                    if 0x61 <= *c && *c <= 0x7a {
+                        *c &= !0x20;
+                    }
+                }
+
+                let mut write_offset = 0;
+                while write_offset < count {
+                    match serial.write(&buf[write_offset..count]) {
+                        Ok(len) if len > 0 => {
+                            write_offset += len;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 }
