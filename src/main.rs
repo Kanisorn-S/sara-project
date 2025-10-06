@@ -13,10 +13,18 @@ use usb_device::prelude::*;
 use core::fmt::Write;
 use heapless::String;
 
+use libm::{powf, logf};
+
 use panic_halt as _;
 
 
 static mut EP_MEMORY: MaybeUninit<[u32; 1024]> = MaybeUninit::uninit();
+
+const T_0: f32 = 298.15;
+const BETA: f32 = 4050.0;
+const V_S: f32 = 3.3;
+const R_REF: f32 = 10000.0;
+const R_0: f32 = 10000.0;
 
 #[entry]
 fn main() -> ! {
@@ -39,14 +47,6 @@ fn main() -> ! {
     ccdr.peripheral.kernel_adc_clk_mux(AdcClkSel::Per);
 
     let mut delay = Delay::new(cp.SYST, ccdr.clocks);
-
-    // If your hardware uses the internal USB voltage regulator in ON mode, you
-    // should uncomment this block.
-    // unsafe {
-    //     let pwr = &*stm32::PWR::ptr();
-    //     pwr.cr3.modify(|_, w| w.usbregen().set_bit());
-    //     while pwr.cr3.read().usb33rdy().bit_is_clear() {}
-    // }
 
     // IO
     let (pin_dm, pin_dp) = {
@@ -117,10 +117,17 @@ fn main() -> ! {
 
         let data: u32 = adc1.read(&mut channel).unwrap();
 
-        let voltage_level = data as f32 * (2.5 / adc1.slope() as f32) * 1000f32;
+        let voltage_different = data as f32 * (2.5 / adc1.slope() as f32) * 1000f32;
+
+        let v_buffer = (22 / 47) as f32 * voltage_different;
+
+        let to_ln = ((V_S - 2f32 * v_buffer) * R_REF) / ((V_S + 2f32 * v_buffer) * R_0);
+        let temp_k = powf((1f32 / T_0) + ((1f32 / BETA) * logf(to_ln)), -1f32);
+
+        let temp_c = temp_k - 273.15;
 
         let mut m: String<32> = String::new();
-        write!(m, "Voltage level: {} mV\r\n", voltage_level).unwrap();
+        write!(m, "Temperature: {} C\r\n", temp_c).unwrap();
 
         match serial.write(m.as_bytes()) {
             _ => {}
