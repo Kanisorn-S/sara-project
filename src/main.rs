@@ -42,17 +42,21 @@ fn main() -> ! {
 
     // If your hardware uses the internal USB voltage regulator in ON mode, you
     // should uncomment this block.
-    unsafe {
-        let pwr = &*stm32::PWR::ptr();
-        pwr.cr3.modify(|_, w| w.usbregen().set_bit());
-        while pwr.cr3.read().usb33rdy().bit_is_clear() {}
-    }
+    // unsafe {
+    //     let pwr = &*stm32::PWR::ptr();
+    //     pwr.cr3.modify(|_, w| w.usbregen().set_bit());
+    //     while pwr.cr3.read().usb33rdy().bit_is_clear() {}
+    // }
 
     // IO
     let (pin_dm, pin_dp) = {
         let gpioa = dp.GPIOA.split(ccdr.peripheral.GPIOA);
         (gpioa.pa11.into_alternate(), gpioa.pa12.into_alternate())
     };
+
+    // LED
+    let gpioe = dp.GPIOE.split(ccdr.peripheral.GPIOE);
+    let mut led = gpioe.pe3.into_push_pull_output();
 
     // ADC
     let mut adc1 = adc::Adc::adc1(
@@ -105,6 +109,7 @@ fn main() -> ! {
             .device_class(usbd_serial::USB_CLASS_CDC)
             .build();
 
+
     loop {
         if !usb_dev.poll(&mut [&mut serial]) {
             continue;
@@ -112,14 +117,18 @@ fn main() -> ! {
 
         let data: u32 = adc1.read(&mut channel).unwrap();
 
-        let voltage_level = data as f32 * (3.3 / adc1.slope() as f32);
+        let voltage_level = data as f32 * (2.5 / adc1.slope() as f32) * 1000f32;
 
         let mut m: String<32> = String::new();
-        write!(m, "Voltage level: {}\r\n", voltage_level).unwrap();
+        write!(m, "Voltage level: {} mV\r\n", voltage_level).unwrap();
 
         match serial.write(m.as_bytes()) {
             _ => {}
         }
+
+        led.toggle();
+
+        delay.delay_ms(500_u16);
 
     }
 }
