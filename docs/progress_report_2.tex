@@ -12,6 +12,7 @@
 \usepackage{listings}
 \usepackage{listings-rust}
 \usepackage{xurl}
+\usepackage{siunitx}
 
 \lstset{language=Rust, style=boxed}
 \geometry{margin=1in}
@@ -456,7 +457,19 @@ The multimeter measurement, as shown in Figure~\ref{fig:multimeter}, gave a valu
     V_{\text{dmm}} = \SI{49.3}{\milli\volt} \pm \SI{0.4}{\milli\volt}
 \]  
 
-The two results are close, demonstrating that the ADC conversion and UART transmission on the STM32H743 are functioning correctly and reliably.
+From the measurements, we can calculate the error to be
+
+% \begin{align*}
+%     \text{Error} & = |{\frac{V_{\text{out}} - V_{\text{dmm}}}{V_{\text{dmm}}}}| \times 100 \\
+%     & = |\frac{\SI{43.05}{\milli\volt} - \SI{49.3}{\milli\volt}}{\SI{49.3}{\milli\volt}}| \times 100 \\
+%     & \approx 12.68 \percent 
+% \end{align*}
+
+\begin{align*}
+    \text{Error} & = \left|\frac{V_{\text{out}} - V_{\text{dmm}}}{V_{\text{dmm}}}\right| \times 100 \\
+    & = \left|\frac{\SI{43.05}{\milli\volt} - \SI{49.3}{\milli\volt}}{\SI{49.3}{\milli\volt}}\right| \times 100 \\
+    & \approx 12.68 \%
+\end{align*}
 
 
 \section{Conclusion}
