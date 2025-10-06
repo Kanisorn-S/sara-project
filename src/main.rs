@@ -1,70 +1,141 @@
-#![no_std] #![no_main]
-mod gpio;
-mod timer;
-mod adc;
-mod uart;
+#![deny(warnings)]
+#![no_std]
+#![no_main]
 
-use cortex_m::asm::nop;
+use core::mem::MaybeUninit;
 use cortex_m_rt::entry;
-use panic_halt as _;
-use stm32h7xx_hal as _;
-use crate::adc::{ADC1};
-use crate::gpio::{gpio_set_alternate_function, gpio_set_pin_mode, gpio_toggle_pin, rcc_enable_gpio_clock, GpioPort, PinMode};
-use crate::gpio::AlternateFunction::{AF7};
-use crate::timer::delay;
-use crate::uart::{rcc_enable_uart1_clock, Uart};
 
+use stm32h7xx_hal::rcc::rec::{AdcClkSel, UsbClkSel};
+use stm32h7xx_hal::usb_hs::{UsbBus, USB2};
+use stm32h7xx_hal::{adc, delay::Delay, prelude::*, stm32};
+use usb_device::prelude::*;
+
+use core::fmt::Write;
+use heapless::String;
+
+use libm::{powf, logf};
+
+use panic_halt as _;
+
+
+static mut EP_MEMORY: MaybeUninit<[u32; 1024]> = MaybeUninit::uninit();
+
+const T_0: f32 = 298.15;
+const BETA: f32 = 4050.0;
+const V_S: f32 = 3.3;
+const R_REF: f32 = 10000.0;
+const R_0: f32 = 10000.0;
 
 #[entry]
 fn main() -> ! {
-    const LED_PIN_PORT: GpioPort = GpioPort::E;
-    const LED_PIN: u8 = 3;
+    let cp = cortex_m::Peripherals::take().unwrap();
+    let dp = stm32::Peripherals::take().unwrap();
 
-    const UART1_BASE_ADDR: u32 = 0x4001_1000;
-    const UART1_GPIO_PORT: GpioPort = GpioPort::A;
-    const UART1_TX_PIN: u8 = 9;
-    const UART1_RX_PIN: u8 = 10;
+    // Power
+    let pwr = dp.PWR.constrain();
+    let vos = pwr.freeze();
 
-    let uart1 = Uart::new(UART1_BASE_ADDR);
-    
-    let adc1 = ADC1::new();
+    // RCC
+    let rcc = dp.RCC.constrain();
+    let mut ccdr = rcc.sys_ck(80.MHz()).freeze(vos, &dp.SYSCFG);
 
+    // 48MHz CLOCK
+    let _ = ccdr.clocks.hsi48_ck().expect("HSI48 must run");
+    ccdr.peripheral.kernel_usb_clk_mux(UsbClkSel::Hsi48);
 
+    // Set adc_ker_ck
+    ccdr.peripheral.kernel_adc_clk_mux(AdcClkSel::Per);
+
+    let mut delay = Delay::new(cp.SYST, ccdr.clocks);
+
+    // IO
+    let (pin_dm, pin_dp) = {
+        let gpioa = dp.GPIOA.split(ccdr.peripheral.GPIOA);
+        (gpioa.pa11.into_alternate(), gpioa.pa12.into_alternate())
+    };
+
+    // LED
+    let gpioe = dp.GPIOE.split(ccdr.peripheral.GPIOE);
+    let mut led = gpioe.pe3.into_push_pull_output();
+
+    // ADC
+    let mut adc1 = adc::Adc::adc1(
+        dp.ADC1,
+        4.MHz(),
+        &mut delay,
+        ccdr.peripheral.ADC12,
+        &ccdr.clocks,
+    ).enable();
+    adc1.set_resolution(adc::Resolution::SixteenBit);
+
+    // Setup GPIOC
+    let gpioc = dp.GPIOC.split(ccdr.peripheral.GPIOC);
+
+    // Configure pc0 as an analog input
+    let mut channel = gpioc.pc0.into_analog();
+
+    let usb = USB2::new(
+        dp.OTG2_HS_GLOBAL,
+        dp.OTG2_HS_DEVICE,
+        dp.OTG2_HS_PWRCLK,
+        pin_dm,
+        pin_dp,
+        ccdr.peripheral.USB2OTG,
+        &ccdr.clocks,
+    );
+
+    // Initialise EP_MEMORY to zero
     unsafe {
-        rcc_enable_gpio_clock(LED_PIN_PORT);
-        gpio_set_pin_mode(LED_PIN_PORT, LED_PIN, PinMode::OUTPUT);
-
-
-        rcc_enable_gpio_clock(UART1_GPIO_PORT);
-        gpio_set_pin_mode(UART1_GPIO_PORT, UART1_RX_PIN, PinMode::ALTERNATE);
-        gpio_set_pin_mode(UART1_GPIO_PORT, UART1_TX_PIN, PinMode::ALTERNATE);
-
-        gpio_set_alternate_function(UART1_GPIO_PORT, UART1_RX_PIN, AF7);
-        gpio_set_alternate_function(UART1_GPIO_PORT, UART1_TX_PIN, AF7);
-
-        rcc_enable_uart1_clock();
-
-        uart1.init(115200);
-        
-        adc1.init();
+        let buf: &mut [MaybeUninit<u32>; 1024] =
+            &mut *(core::ptr::addr_of_mut!(EP_MEMORY) as *mut _);
+        for value in buf.iter_mut() {
+            value.as_mut_ptr().write(0);
+        }
     }
+
+    // Now we may assume that EP_MEMORY is initialised
+    #[allow(static_mut_refs)] // TODO: Fix this
+    let usb_bus = UsbBus::new(usb, unsafe { EP_MEMORY.assume_init_mut() });
+
+    let mut serial = usbd_serial::SerialPort::new(&usb_bus);
+
+    let mut usb_dev =
+        UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
+            .strings(&[usb_device::device::StringDescriptors::default()
+                .manufacturer("Fake company")
+                .product("Serial port")
+                .serial_number("TEST PORT 1")])
+            .unwrap()
+            .device_class(usbd_serial::USB_CLASS_CDC)
+            .build();
 
 
     loop {
-        let adc_value: u32;
-        unsafe {
-            gpio_toggle_pin(LED_PIN_PORT, LED_PIN);
-            delay(1_000_000);
-            adc1.start_conversion();
-            adc1.wait_for_conversion();
-            adc_value = adc1.read_value();
-            let bytes = adc_value.to_be_bytes();
-            for b in &bytes {
-                uart1.send_byte(*b);
-            }
+        if !usb_dev.poll(&mut [&mut serial]) {
+            continue;
         }
 
-        nop();
-        delay(1_000_000);
+        let data: u32 = adc1.read(&mut channel).unwrap();
+
+        let voltage_different = data as f32 * (2.5 / adc1.slope() as f32) * 1000f32;
+
+        let v_buffer = (22 / 47) as f32 * voltage_different;
+
+        let to_ln = ((V_S - 2f32 * v_buffer) * R_REF) / ((V_S + 2f32 * v_buffer) * R_0);
+        let temp_k = powf((1f32 / T_0) + ((1f32 / BETA) * logf(to_ln)), -1f32);
+
+        let temp_c = temp_k - 273.15;
+
+        let mut m: String<32> = String::new();
+        write!(m, "Temperature: {} C\r\n", temp_c).unwrap();
+
+        match serial.write(m.as_bytes()) {
+            _ => {}
+        }
+
+        led.toggle();
+
+        delay.delay_ms(500_u16);
+
     }
 }
