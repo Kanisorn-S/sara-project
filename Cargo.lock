@@ -299,6 +299,7 @@ dependencies = [
  "cortex-m-rt",
  "defmt",
  "defmt-rtt",
+ "heapless",
  "panic-halt",
  "st7735-lcd",
  "stm32h7xx-hal",

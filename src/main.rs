@@ -3,18 +3,24 @@
 #![no_main]
 
 use core::mem::MaybeUninit;
-
 use cortex_m_rt::entry;
 
-use stm32h7xx_hal::rcc::rec::UsbClkSel;
+use stm32h7xx_hal::rcc::rec::{AdcClkSel, UsbClkSel};
 use stm32h7xx_hal::usb_hs::{UsbBus, USB2};
-use stm32h7xx_hal::{prelude::*, stm32};
+use stm32h7xx_hal::{adc, delay::Delay, prelude::*, stm32};
 use usb_device::prelude::*;
+
+use core::fmt::Write;
+use heapless::String;
+
+use panic_halt as _;
+
 
 static mut EP_MEMORY: MaybeUninit<[u32; 1024]> = MaybeUninit::uninit();
 
 #[entry]
 fn main() -> ! {
+    let cp = cortex_m::Peripherals::take().unwrap();
     let dp = stm32::Peripherals::take().unwrap();
 
     // Power
@@ -29,6 +35,11 @@ fn main() -> ! {
     let _ = ccdr.clocks.hsi48_ck().expect("HSI48 must run");
     ccdr.peripheral.kernel_usb_clk_mux(UsbClkSel::Hsi48);
 
+    // Set adc_ker_ck
+    ccdr.peripheral.kernel_adc_clk_mux(AdcClkSel::Per);
+
+    let mut delay = Delay::new(cp.SYST, ccdr.clocks);
+
     // If your hardware uses the internal USB voltage regulator in ON mode, you
     // should uncomment this block.
     unsafe {
@@ -42,6 +53,22 @@ fn main() -> ! {
         let gpioa = dp.GPIOA.split(ccdr.peripheral.GPIOA);
         (gpioa.pa11.into_alternate(), gpioa.pa12.into_alternate())
     };
+
+    // ADC
+    let mut adc1 = adc::Adc::adc1(
+        dp.ADC1,
+        4.MHz(),
+        &mut delay,
+        ccdr.peripheral.ADC12,
+        &ccdr.clocks,
+    ).enable();
+    adc1.set_resolution(adc::Resolution::SixteenBit);
+
+    // Setup GPIOC
+    let gpioc = dp.GPIOC.split(ccdr.peripheral.GPIOC);
+
+    // Configure pc0 as an analog input
+    let mut channel = gpioc.pc0.into_analog();
 
     let usb = USB2::new(
         dp.OTG2_HS_GLOBAL,
@@ -83,28 +110,16 @@ fn main() -> ! {
             continue;
         }
 
-        let mut buf = [0u8; 64];
+        let data: u32 = adc1.read(&mut channel).unwrap();
 
-        match serial.read(&mut buf) {
-            Ok(count) if count > 0 => {
-                // Echo back in upper case
-                for c in buf[0..count].iter_mut() {
-                    if 0x61 <= *c && *c <= 0x7a {
-                        *c &= !0x20;
-                    }
-                }
+        let voltage_level = data as f32 * (3.3 / adc1.slope() as f32);
 
-                let mut write_offset = 0;
-                while write_offset < count {
-                    match serial.write(&buf[write_offset..count]) {
-                        Ok(len) if len > 0 => {
-                            write_offset += len;
-                        }
-                        _ => {}
-                    }
-                }
-            }
+        let mut m: String<32> = String::new();
+        write!(m, "Voltage level: {}\r\n", voltage_level).unwrap();
+
+        match serial.write(m.as_bytes()) {
             _ => {}
         }
+
     }
 }
