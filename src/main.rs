@@ -127,7 +127,7 @@ fn main() -> ! {
         let temp_c = temp_k - 273.15;
 
         let mut m: String<32> = String::new();
-        write!(m, "Temperature: {} C\r\n", temp_c).unwrap();
+        write!(m, "Temperature: {:.2} C\r\n", temp_c).unwrap();
 
         match serial.write(m.as_bytes()) {
             _ => {}
