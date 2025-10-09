@@ -117,9 +117,9 @@ fn main() -> ! {
 
         let data: u32 = adc1.read(&mut channel).unwrap();
 
-        let voltage_different = data as f32 * (2.5 / adc1.slope() as f32) * 1000f32;
+        let voltage_different = data as f32 * (2.5 / adc1.slope() as f32);
 
-        let v_buffer = (22 / 47) as f32 * voltage_different;
+        let v_buffer = (22.0 / 47.0) * voltage_different;
 
         let to_ln = ((V_S - 2f32 * v_buffer) * R_REF) / ((V_S + 2f32 * v_buffer) * R_0);
         let temp_k = powf((1f32 / T_0) + ((1f32 / BETA) * logf(to_ln)), -1f32);
