@@ -13,6 +13,7 @@
 \usepackage{listings-rust}
 \usepackage{xurl}
 \usepackage{siunitx}
+\usepackage{tikz}
 
 \lstset{language=Rust, style=boxed}
 \geometry{margin=1in}
@@ -37,8 +38,26 @@ This report documents the implementation of Analog-to-Digital Conversion, softwa
     \label{fig:circuit}
 \end{figure}
 
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}
+    \node[anchor=south west, inner sep=0] (img) {\includegraphics[width=0.9\linewidth]{images/actual_circuit.jpg}};
+    \begin{scope}[x={(img.south east)}, y={(img.north west)}]
+      % Example markers (adjust coordinates)
+      \draw[red, line width=5pt, rounded corners] (0.7,0.45) rectangle (0.6,0.58);
+      \node[red, fill=white, font=\small, align=center] at (0.75,0.80) {Thermistor and adjacent fixed resistor};
+
+      % Optional arrows
+      \draw[->, line width=2pt, red] (0.75,0.77) -- (0.7,0.58);
+    \end{scope}
+  \end{tikzpicture}
+  \caption{Physical implementation of the circuit showing the thermistor and the adjacent fixed resistor (highlighted) used in the adjustable voltage divider for temperature control.}
+  \label{fig:actual-circuit}
+\end{figure}
+
+
 \section{Circuit Design}
-An adjustable voltage divider was added to the original circuit design, as shown in Figure~\ref{fig:circuit}, to manipulate the temperature of the thermistor.
+An adjustable voltage divider was added to the original circuit design, as shown in Figure~\ref{fig:circuit}, to manipulate the temperature of the thermistor. In the physical implementation shown in Figure~\ref{fig:actual-circuit}, the fixed resistor of the voltage divider is positioned adjacent to the thermistor so that changes in the resistor’s temperature directly influence the thermistor’s resistance.
 
 The voltage divider consists of 
 \begin{itemize}
@@ -76,7 +95,7 @@ For this project, a fixed resistor is used in conjunction with the potentiometer
 \section{Mathematical Model}
 
 \subsection{Temperature Manipulation}
-We use our STM32H743VIT6 Core Board's \SI{3.3}{\volt} to power the adjustable voltage divider, giving us $V_s=\SI{3.3}{\volt}$. To manipulate the temperature of the thermistor, we can adjust the angle $\theta$ of the potentiometer. From Equation~\ref{eq:v-heat-theta}, we can see that the maximum voltage across the fixed resistor occurs when $\theta = \SI{0}{\degree}$, which gives us:
+We use our STM32H743VIT6 Core Board's \SI{3.3}{\volt} to power the adjustable voltage divider, giving us $V_s=\SI{3.3}{\volt}$. To manipulate the temperature of the thermistor, we can adjust the angle $\theta$ of the potentiometer. From Equation~\eqref{eq:v-heat-theta}, we can see that the maximum voltage across the fixed resistor occurs when $\theta = \SI{0}{\degree}$, which gives us:
 \begin{equation*}
     V_{\text{Heat, Min}} = V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + 0} = V_s = \SI{3.3}{\volt}
 \end{equation*}
