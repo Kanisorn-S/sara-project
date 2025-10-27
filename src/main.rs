@@ -29,21 +29,24 @@ fn main() -> ! {
     .freeze(pwrcfg, &dp.SYSCFG);
 
   // === GPIO ===
-  let gpioc = dp.GPIOC.split(ccdr.peripheral.GPIOC);
   let gpiob = dp.GPIOB.split(ccdr.peripheral.GPIOB);
+  let gpioe = dp.GPIOE.split(ccdr.peripheral.GPIOE);
+
+  // === LED ===
+  let mut led = gpioe.pe3.into_push_pull_output();
 
   // SPI pins
-  let sck = gpioc.pc10.into_alternate();
-  let miso = gpioc.pc11.into_alternate();
-  let mosi = gpioc.pc12.into_alternate();
+  let sck = gpiob.pb13.into_alternate();
+  let miso = gpiob.pb14.into_alternate();
+  let mosi = gpiob.pb15.into_alternate();
   let cs = gpiob.pb12.into_push_pull_output();
 
   // === SPI peripheral ===
-  let spi = dp.SPI3.spi(
+  let spi = dp.SPI2.spi(
     (sck, miso, mosi),
     spi::MODE_0,
     3.MHz(),
-    ccdr.peripheral.SPI3,
+    ccdr.peripheral.SPI2,
     &ccdr.clocks,
   );
 
@@ -62,13 +65,11 @@ fn main() -> ! {
   let mut mcp41x = Mcp4x::new_mcp41x(dev);
 
   // === Control the potentiometer ===
-  mcp41x.set_position(Channel::Ch0, 128).unwrap();
+  mcp41x.set_position(Channel::Ch0, 255).unwrap();
 
   loop {
-    for pos in (0..=255).step_by(8) {
-      mcp41x.set_position(Channel::Ch0, pos).ok();
-      cortex_m::asm::delay(10_000_000);
-    }
+    led.toggle();
+    cortex_m::asm::delay(10_000_000);
   }
 }
 
