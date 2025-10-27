@@ -44,11 +44,11 @@ This report documents the implementation of Analog-to-Digital Conversion, softwa
     \node[anchor=south west, inner sep=0] (img) {\includegraphics[width=0.9\linewidth]{images/actual_circuit.jpg}};
     \begin{scope}[x={(img.south east)}, y={(img.north west)}]
       % Example markers (adjust coordinates)
-      \draw[red, line width=5pt, rounded corners] (0.7,0.45) rectangle (0.6,0.58);
-      \node[red, fill=white, font=\small, align=center] at (0.75,0.80) {Thermistor and adjacent fixed resistor};
+      \draw[red, line width=5pt, rounded corners] (0.65,0.6) rectangle (0.55,0.74);
+      \node[red, fill=white, font=\small, align=center] at (0.75,0.90) {Thermistor and adjacent fixed resistor};
 
       % Optional arrows
-      \draw[->, line width=2pt, red] (0.75,0.77) -- (0.7,0.58);
+      \draw[->, line width=2pt, red] (0.75,0.87) -- (0.65,0.74);
     \end{scope}
   \end{tikzpicture}
   \caption{Physical implementation of the circuit showing the thermistor and the adjacent fixed resistor (highlighted) used in the adjustable voltage divider for temperature control.}
