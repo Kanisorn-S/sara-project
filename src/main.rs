@@ -13,6 +13,14 @@ use embedded_hal_compat::ForwardCompat;
 use embedded_hal_bus::spi::ExclusiveDevice;
 use mcp4x::{Channel, Mcp4x};
 use panic_halt as _;
+use embedded_hal::delay::DelayNs;
+
+struct NoopDelay;
+impl DelayNs for NoopDelay {
+    fn delay_ns(&mut self, _ns: u32) {
+        // Do nothing
+    }
+}
 
 #[entry]
 fn main() -> ! {
@@ -51,21 +59,21 @@ fn main() -> ! {
   );
 
   // === Delay ===
-  let delay = Delay::new(cp.SYST, ccdr.clocks);
+  let _delay = Delay::new(cp.SYST, ccdr.clocks);
 
   // === Convert all to embedded-hal 1.0 traits ===
   let spi_v1 = spi.forward();
   let cs_v1 = cs.forward();
-  let delay_v1 = delay.forward();
+  // let delay_v1 = delay.forward();
 
   // === Wrap in ExclusiveDevice ===
-  let dev = ExclusiveDevice::new(spi_v1, cs_v1, delay_v1).unwrap();
+  let dev = ExclusiveDevice::new(spi_v1, cs_v1, NoopDelay).unwrap();
 
   // === Construct the MCP41010 ===
   let mut mcp41x = Mcp4x::new_mcp41x(dev);
 
   // === Control the potentiometer ===
-  mcp41x.set_position(Channel::Ch0, 255).unwrap();
+  mcp41x.set_position(Channel::Ch0, 0).unwrap();
 
   loop {
     led.toggle();
