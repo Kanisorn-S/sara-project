@@ -5,18 +5,22 @@
 use core::mem::MaybeUninit;
 use cortex_m_rt::entry;
 
-use stm32h7xx_hal::rcc::rec::{AdcClkSel, UsbClkSel};
+use stm32h7xx_hal::rcc::rec::{AdcClkSel, UsbClkSel, Spi123ClkSel};
 use stm32h7xx_hal::usb_hs::{UsbBus, USB2};
-use stm32h7xx_hal::{adc, delay::Delay, prelude::*, stm32};
+use stm32h7xx_hal::{spi, adc, delay::Delay, prelude::*, stm32};
 use usb_device::prelude::*;
 
+use embedded_hal_compat::{ForwardCompat};
+use embedded_hal_bus::spi::ExclusiveDevice;
+use mcp4x::{Channel, Mcp4x};
+
 use core::fmt::Write;
+use cortex_m::asm::nop;
 use heapless::String;
 
 use libm::{powf, logf};
 
 use panic_halt as _;
-
 
 static mut EP_MEMORY: MaybeUninit<[u32; 1024]> = MaybeUninit::uninit();
 
@@ -25,6 +29,18 @@ const BETA: f32 = 4050.0;
 const V_S: f32 = 3.3;
 const R_REF: f32 = 10000.0;
 const R_0: f32 = 10000.0;
+const POT_VALUE: u8 = 0;
+
+use embedded_hal::delay::DelayNs;
+// use stm32h7xx_hal::device::SPI2;
+// use stm32h7xx_hal::spi::{Enabled, Spi};
+
+struct NoopDelay;
+impl DelayNs for NoopDelay {
+  fn delay_ns(&mut self, _ns: u32) {
+    nop();
+  }
+}
 
 #[entry]
 fn main() -> ! {
@@ -46,6 +62,8 @@ fn main() -> ! {
     // Set adc_ker_ck
     ccdr.peripheral.kernel_adc_clk_mux(AdcClkSel::Per);
 
+    ccdr.peripheral.kernel_spi123_clk_mux(Spi123ClkSel::Per);
+
     let mut delay = Delay::new(cp.SYST, ccdr.clocks);
 
     // IO
@@ -53,6 +71,27 @@ fn main() -> ! {
         let gpioa = dp.GPIOA.split(ccdr.peripheral.GPIOA);
         (gpioa.pa11.into_alternate(), gpioa.pa12.into_alternate())
     };
+
+    // GPIO
+    let gpiob = dp.GPIOB.split(ccdr.peripheral.GPIOB);
+
+    // SPI
+    let sck = gpiob.pb13.into_alternate();
+    let miso = gpiob.pb14.into_alternate();
+    let mosi = gpiob.pb15.into_alternate();
+    let cs = gpiob.pb12.into_push_pull_output();
+
+    let spi = dp.SPI2.spi(
+      (sck, miso, mosi),
+      spi::MODE_0,
+      3.MHz(),
+      ccdr.peripheral.SPI2,
+      &ccdr.clocks,
+    );
+
+    let spi_v1= spi.forward();
+    let cs_v1 = cs.forward();
+
 
     // LED
     let gpioe = dp.GPIOE.split(ccdr.peripheral.GPIOE);
@@ -67,6 +106,12 @@ fn main() -> ! {
         &ccdr.clocks,
     ).enable();
     adc1.set_resolution(adc::Resolution::SixteenBit);
+
+    let dev = ExclusiveDevice::new(spi_v1, cs_v1, NoopDelay).unwrap();
+
+    let mut mcp41x = Mcp4x::new_mcp41x(dev);
+
+    mcp41x.set_position(Channel::Ch0, POT_VALUE).unwrap();
 
     // Setup GPIOC
     let gpioc = dp.GPIOC.split(ccdr.peripheral.GPIOC);
