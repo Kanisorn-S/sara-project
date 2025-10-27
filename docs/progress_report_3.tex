@@ -68,7 +68,7 @@ By adjusting the potentiometer, the voltage across the fixed resistor can be cha
 
 \subsection{Components}
 \subsubsection{Potentiometer}
-For this project, a B Linear Taper 1 Turn Rotary Potentiometer is used to adjust the voltage divider ratio, thus adjusting the voltage across the fixed resistor. The voltage across the fixed resistor $V_{\text{Heat}}$ can be calculated using the formula:
+For this project, a digital potentiometer is used to adjust the voltage divider ratio, thus adjusting the voltage across the fixed resistor. The voltage across the fixed resistor $V_{\text{Heat}}$ can be calculated using the formula:
 
 \begin{equation*}
     V_{\text{Heat}} = V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot}}}
@@ -77,17 +77,17 @@ For this project, a B Linear Taper 1 Turn Rotary Potentiometer is used to adjust
 Where:
 
 \begin{equation*}
-    R_{\text{Pot}} = R_{\text{Pot, Max}} \cdot \frac{\theta}{\theta_{\text{Max}}}
+    R_{\text{Pot}} = R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}
 \end{equation*}
 
 Giving us:
 
 \begin{equation}
     \label{eq:v-heat-theta}
-    V_{\text{Heat}} = V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}} \cdot \frac{\theta}{\theta_{\text{Max}}}}
+    V_{\text{Heat}} = V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}
 \end{equation}
 
-The selected potentiometer is the WH148 B Linear Taper 1 Turn Rotary Potentiometer with a maximum resistance of $\SI{10}{k\ohm}\pm 20\%$~\cite{potentiometer}.
+The selected potentiometer is the MCP41010 Single Digital Potentiometer with 256 taps and a maximum resistance of $\SI{10}{k\ohm}\pm 20\%$~\cite{potentiometer},\cite{pot-tolerance}.
 
 \subsubsection{Fixed Resistor}
 For this project, a fixed resistor is used in conjunction with the potentiometer to form the voltage divider. The value of the fixed resistor $R_{\text{Heat}}$ is chosen to be $\SI{560}{\ohm}\pm 1\%$. This value is selected to ensure that the voltage across the fixed resistor can be adjusted within a suitable range for heating purposes.
@@ -95,11 +95,11 @@ For this project, a fixed resistor is used in conjunction with the potentiometer
 \section{Mathematical Model}
 
 \subsection{Temperature Manipulation}
-We use our STM32H743VIT6 Core Board's \SI{3.3}{\volt} to power the adjustable voltage divider, giving us $V_s=\SI{3.3}{\volt}$. To manipulate the temperature of the thermistor, we can adjust the angle $\theta$ of the potentiometer. From Equation~\eqref{eq:v-heat-theta}, we can see that the maximum voltage across the fixed resistor occurs when $\theta = \SI{0}{\degree}$, which gives us:
+We use our STM32H743VIT6 Core Board's \SI{3.3}{\volt} to power the adjustable voltage divider, giving us $V_s=\SI{3.3}{\volt}$. To manipulate the temperature of the thermistor, we can set the value $\text{pot\_value}$ of the potentiometer. From Equation~\eqref{eq:v-heat-theta}, we can see that the maximum voltage across the fixed resistor occurs when $\text{pot\_value} = 0$, which gives us:
 \begin{equation*}
     V_{\text{Heat, Min}} = V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + 0} = V_s = \SI{3.3}{\volt}
 \end{equation*}
-While the minimum voltage occurs when $\theta = \theta_{\text{Max}}$, which gives us:
+While the minimum voltage occurs when $\text{pot\_value} = \text{pot\_value}_{\text{Max}}$, which gives us:
 \begin{equation*}
     V_{\text{Heat, Max}} = V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}}} = \SI{3.3}{\volt} \cdot \frac{\SI{560}{\ohm}}{\SI{560}{\ohm} + \SI{10}{k\ohm}} = \SI{0.175}{\volt}
 \end{equation*}
@@ -141,13 +141,108 @@ Combining the two equations, we get:
 \end{equation}
 To get the full equation, we combine Equation~\ref{eq:v-heat-theta} and Equation~\ref{eq:delta-t} to get:
 \begin{equation}
-    \Delta T = R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}} \cdot \frac{\theta}{\theta_{\text{Max}}}}\right)^2}{R_{\text{Heat}}}
+    \Delta T = R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}\right)^2}{R_{\text{Heat}}}
     \label{eq:full-delta-t}
 \end{equation}
+
+Finally, the temperature that our sensor will be measuring is given by
+\begin{align}
+    T &= T_{\text{ambient}} + \Delta T \nonumber \\
+      &= T_{\text{ambient}} + R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}\right)^2}{R_{\text{Heat}}} \label{eq:final-temp}
+\end{align}
+Where $T_{\text{ambient}}$ is a parameter of our system and must be determined before using the sensor.
 
 
 \label{sec:math-model}
 
+\subsection{Kalman Filter}
+We first design the mathematical formalism of the Kalman Filter for our system. The equation for our system is
+
+\begin{align}
+    &x_k = A x_{k-1} + C + w_{k-1} \\
+    &w_k \sim \mathcal{N}(0,\mathbf{Q}) \label{eq:q}
+\end{align}
+Where $x_k$ is the state variable at time $k$, $A$ is the state transition coefficient, $C$ is the additive component, and $w_k$ is the system process noise at time $k$.
+
+The equation for our sensor measurement is
+
+\begin{align}
+    &z_k = H x_k + v_k \\
+    &v_k \sim \mathcal{N}(0, \mathbf{R}) \label{eq:r}
+\end{align}
+Where $z_k$ is the sensor output at time $k$, $H$ is the sensing coefficient, and $v_k$ is the sensing noise.
+
+Because our system is concerned only with temperature measurement, the corresponding coefficients are represented as scalars rather than matrices.
+
+\subsubsection{State Variable $x_k$}
+Because our system is concerned only with temperature measurement, the state variable $x_k$ is a single scalar value 
+
+\begin{equation*}
+    x_k = T_k
+\end{equation*}
+
+which represents the temperature of the system at time $k$.
+
+\subsubsection{State Transition Coefficient $A$}
+From Equation~\eqref{eq:final-temp}, we can control the temperature of the system $T$ by programatically adjusting the value of the digital potentiometer $\text{pot\_value}$. Since the temperature of the system at any given time is only dependent on the current setting of the potentiometer and not on the previous temperature, the state transition coefficient $A$ is
+
+\begin{equation*}
+    A = 0
+\end{equation*}
+
+\subsubsection{Additive Component $C$}
+From Equation~\eqref{eq:final-temp}, we can control the temperature of the system $T$ by programatically adjusting the value of the digital potentiometer $\text{pot\_value}$; therefore, the additive component $C$ is given by
+
+\begin{equation*}
+    C = T_{\text{ambient}} + R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}\right)^2}{R_{\text{Heat}}}
+\end{equation*}
+
+\subsubsection{Sensing Coefficient $H$}
+Since our sensor is measuring the temperature, which is the value we want to know, the sensing coefficient $H$ is simply
+
+\begin{equation*}
+    H = 1
+\end{equation*}
+
+\subsubsection{Process Covariance $Q$}
+From Equation~\eqref{eq:q}, $Q$ is the covariance of our system process noise $w_k$. We can calculate this by taking multiple temperature measurements for multiple states of our system (multiple different $\text{pot\_value}$) using a trustworthy digital thermometer then finding the covariance using
+
+\begin{equation}
+    \label{eq:cov}
+    \mathrm{Cov}(X) = \frac{1}{N} \sum_{i=1}^{N} (X_i - \mu_X)^2
+\end{equation}
+
+Twenty temperature measurements were recorded using a reliable digital thermometer positioned near the thermistor, as shown in Figure~\ref{fig:measure-temp}, for each of the following 15 $\text{pot\_value}$
+
+\begin{equation}
+    \label{eq:pot-value}
+    \text{pot\_value} = 0, 17, 34, 51, 68, 85, 102, 119, 136, 153, 170, 187, 204, 221, 238, 255
+\end{equation}
+
+From the result in \ref{app:q}, we can find $Q$ by using Equation~\eqref{eq:cov}, which gives us
+
+\begin{align*}
+    Q = \mathrm{Cov}(T) &= \frac{1}{N} \sum_{i=1}^{N} (T_i - \mu_T)^2 \\
+    &= \frac{1}{320} \sum_{i=1}^{320} (T_i - \SI{26.53}{\degreeCelsius})^2 \\
+    &= 0.035
+\end{align*}
+
+\subsubsection{Sensor Noise Covariance $R$}
+From Equation~\eqref{eq:r}, $R$ is the covariance of our sensor noise $v_k$. We can calculate this by taking multiple temperature measurements for multiple states of our system (multiple different $\text{pot\_value}$) using both a trustworthy digital thermometer and our temperature sensor then finding the covariance using
+
+\begin{equation}
+    \label{eq:cov-sensor}
+    \mathrm{Cov}(X) = \frac{1}{N} \sum_{i=1}^{N} (X_i - \mu_X)^2
+\end{equation}
+Where $\mu_X$ is the temperature read by the digital thermometer.
+
+Twenty temperature measurements were recorded for each of the $\text{pot\_value}$ in~\eqref{eq:pot-value}
+
+From the result in \ref{app:r}, we can find $R$ by using Equation~\eqref{eq:cov-sensor} for each $\text{pot\_value}$ setting then averaging over all the $\text{pot\_value}$. This gives us
+
+\begin{align*}
+    R = 0.396
+\end{align*}
 
 \section{Demonstration and Verification}
 
@@ -158,4 +253,12 @@ To get the full equation, we combine Equation~\ref{eq:v-heat-theta} and Equation
 \bibliographystyle{IEEEtran}
 \bibliography{ref}
 
+\newpage
+\appendix
+
+\section{\texorpdfstring{Temperature Measurement for Calculating the Process Covariance $Q$}{Temperature Measurement for Calculating the Process Covariance}}
+\label{app:q}
+
+\section{\texorpdfstring{Temperature Measurement for Calculating the Sensor Noise Covariance $R$}{Temperature Measurement for Calculating the Sensor Noise Covariance}}
+\label{app:r}
 \end{document}
