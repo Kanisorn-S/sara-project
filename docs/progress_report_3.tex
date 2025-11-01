@@ -29,7 +29,7 @@ Automation\\Term Project Progress Report III}
 \maketitle
 
 \section{Introduction}
-This report documents the implementation of Analog-to-Digital Conversion, software configuration, and sensor value read for a thermistor-based temperature sensor system. The STM32H743VIT6 core board by WeAct Studio is used to perform the analog to digital conversion and transmit the measured sensor values via UART communication. The source code for this project can be found in this GitHub repository: \url{https://github.com/Kanisorn-S/sara-project}. The source code for Milestone 2 can be found in the \texttt{Milestone-3} branch: \url{https://github.com/Kanisorn-S/sara-project/tree/Milestone-3}.
+This report presents the design and implementation of an adjustable voltage divider circuit used to manipulate the temperature of a thermistor. The system is implemented using an STM32H743 core board by WeAct Studio, which powers and controls a digital potentiometer to regulate the heating voltage across a fixed resistor. The project further develops a mathematical model to relate potentiometer settings to the resulting temperature and applies a Kalman Filter to improve the accuracy of temperature measurements of our sensor. The source code for this project can be found in this GitHub repository: \url{https://github.com/Kanisorn-S/sara-project}. The source code for Milestone 3 can be found in the \texttt{Milestone-3} branch: \url{https://github.com/Kanisorn-S/sara-project/tree/Milestone-3}.
 
 \begin{figure}[h]
     \centering
@@ -71,7 +71,7 @@ By adjusting the potentiometer, the voltage across the fixed resistor can be cha
 For this project, a digital potentiometer is used to adjust the voltage divider ratio, thus adjusting the voltage across the fixed resistor. The voltage across the fixed resistor $V_{\text{Heat}}$ can be calculated using the formula:
 
 \begin{equation*}
-    V_{\text{Heat}} = V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot}}}
+    V_{\text{Heat}} = V_s \cdot \frac{R_{\text{Heat}}}{R_{\text{Heat}} + R_{\text{Pot}}}
 \end{equation*}
 
 Where:
@@ -84,7 +84,7 @@ Giving us:
 
 \begin{equation}
     \label{eq:v-heat-theta}
-    V_{\text{Heat}} = V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}
+    V_{\text{Heat}} = V_s \cdot \frac{R_{\text{Heat}}}{R_{\text{Heat}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}
 \end{equation}
 
 The selected potentiometer is the MCP41010 Single Digital Potentiometer with 256 taps and a maximum resistance of $\SI{10}{k\ohm}\pm 20\%$~\cite{potentiometer},\cite{pot-tolerance}.
@@ -97,16 +97,16 @@ For this project, a fixed resistor is used in conjunction with the potentiometer
 \subsection{Temperature Manipulation}
 We use our STM32H743VIT6 Core Board's \SI{3.3}{\volt} to power the adjustable voltage divider, giving us $V_s=\SI{3.3}{\volt}$. To manipulate the temperature of the thermistor, we can set the value $\text{pot\_value}$ of the potentiometer. From Equation~\eqref{eq:v-heat-theta}, we can see that the maximum voltage across the fixed resistor occurs when $\text{pot\_value} = 0$, which gives us:
 \begin{equation*}
-    V_{\text{Heat, Min}} = V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + 0} = V_s = \SI{3.3}{\volt}
+    V_{\text{Heat, Min}} = V_s \cdot \frac{R_{\text{Heat}}}{R_{\text{Heat}} + 0} = V_s = \SI{3.3}{\volt}
 \end{equation*}
 While the minimum voltage occurs when $\text{pot\_value} = \text{pot\_value}_{\text{Max}}$, which gives us:
 \begin{equation*}
-    V_{\text{Heat, Max}} = V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}}} = \SI{3.3}{\volt} \cdot \frac{\SI{560}{\ohm}}{\SI{560}{\ohm} + \SI{10}{k\ohm}} = \SI{0.175}{\volt}
+    V_{\text{Heat, Max}} = V_s \cdot \frac{R_{\text{Heat}}}{R_{\text{Heat}} + R_{\text{Pot, Max}}} = \SI{3.3}{\volt} \cdot \frac{\SI{560}{\ohm}}{\SI{560}{\ohm} + \SI{10}{k\ohm}} = \SI{0.175}{\volt}
 \end{equation*}
 Calculating for the error,
 \begin{align*}
-    \frac{\delta V_{\text{Heat}}}{V_{\text{Heat}}} &=  \frac{\delta R_\text{fixed}}{R_\text{fixed}} + \frac{\delta (R_\text{fixed} + R_\text{pot})}{R_\text{fixed} + R_\text{pot}} \\
-    &= 0.01 + \frac{0.01 \cdot R_\text{fixed} + 0.2 \cdot R_\text{pot}}{R_\text{fixed} + R_\text{pot}} \\
+    \frac{\delta V_{\text{Heat}}}{V_{\text{Heat}}} &=  \frac{\delta R_\text{Heat}}{R_\text{Heat}} + \frac{\delta (R_\text{Heat} + R_\text{Pot})}{R_\text{Heat} + R_\text{Pot}} \\
+    &= 0.01 + \frac{0.01 \cdot R_\text{Heat} + 0.2 \cdot R_\text{Pot}}{R_\text{Heat} + R_\text{Pot}} \\
     &= 0.01 + \frac{0.01 \cdot 560 + 0.2 \cdot 10000}{560 + 10000} \\
     &\approx 0.01 + 0.19 \\
     &\approx 0.2
@@ -141,14 +141,14 @@ Combining the two equations, we get:
 \end{equation}
 To get the full equation, we combine Equation~\ref{eq:v-heat-theta} and Equation~\ref{eq:delta-t} to get:
 \begin{equation}
-    \Delta T = R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}\right)^2}{R_{\text{Heat}}}
+    \Delta T = R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Heat}}}{R_{\text{Heat}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}\right)^2}{R_{\text{Heat}}}
     \label{eq:full-delta-t}
 \end{equation}
 
 Finally, the temperature that our sensor will be measuring is given by
 \begin{align}
     T &= T_{\text{ambient}} + \Delta T \nonumber \\
-      &= T_{\text{ambient}} + R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}\right)^2}{R_{\text{Heat}}} \label{eq:final-temp}
+    T &= T_{\text{ambient}} + R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Heat}}}{R_{\text{Heat}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}\right)^2}{R_{\text{Heat}}} \label{eq:final-temp}
 \end{align}
 Where $T_{\text{ambient}}$ is a parameter of our system and must be determined before using the sensor.
 
@@ -194,7 +194,7 @@ From Equation~\eqref{eq:final-temp}, we can control the temperature of the syste
 From Equation~\eqref{eq:final-temp}, we can control the temperature of the system $T$ by programatically adjusting the value of the digital potentiometer $\text{pot\_value}$; therefore, the additive component $C$ is given by
 
 \begin{equation*}
-    C = T_{\text{ambient}} + R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Fixed}}}{R_{\text{Fixed}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}\right)^2}{R_{\text{Heat}}}
+    C = T_{\text{ambient}} + R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Heat}}}{R_{\text{Heat}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}\right)^2}{R_{\text{Heat}}}
 \end{equation*}
 
 \subsubsection{Sensing Coefficient $H$}
@@ -275,12 +275,186 @@ This gives us
 \end{align*}
 
 \section{Demonstration and Verification}
+To verify the improvement in temperature measurement accuracy after applying the Kalman Filter, we can compare the raw sensor readings with the filtered readings against the ground truth temperature measured by a reliable digital thermometer. We first measure the ambient temperature $T_{\text{ambient}}$ using the digital thermometer, which in this case is $\SI{27.5}{\degreeCelsius}$. We then set the $\text{pot\_value}$ to $128$ and take 10 temperature readings from both our temperature sensor and the digital thermometer. We then manually apply our Kalman filter to the raw sensor readings to obtain the filtered readings. The raw sensor readings and the filtered readings are then compared to the ground truth temperature to find their respective mean squared errors (MSE).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/raw_sensor_readings.png}
+    \caption{Raw sensor readings from our temperature sensor}
+    \label{fig:raw-sensor-readings}
+\end{figure}
+
+From Figure~\ref{fig:raw-sensor-readings}, we have the following raw sensor readings:
+
+\begin{align}
+    z_0 &= \SI{25.62}{\degreeCelsius} \nonumber \\
+    z_1 &= \SI{25.62}{\degreeCelsius} \nonumber \\
+    z_2 &= \SI{25.62}{\degreeCelsius} \nonumber \\
+    z_3 &= \SI{25.62}{\degreeCelsius} \nonumber \\
+    z_4 &= \SI{25.62}{\degreeCelsius} \nonumber \\
+    z_5 &= \SI{25.63}{\degreeCelsius} \nonumber \\
+    z_6 &= \SI{25.62}{\degreeCelsius} \nonumber \\
+    z_7 &= \SI{25.62}{\degreeCelsius} \nonumber \\
+    z_8 &= \SI{25.62}{\degreeCelsius} \nonumber \\
+    z_9 &= \SI{25.59}{\degreeCelsius} \nonumber
+\end{align}
+We can then apply the Kalman filter process:
+
+\begin{enumerate}
+    \item \texttt{Initial System Estimation} \\
+    Since we don't know the initial state $x_0$, we can set it to be equal to the first sensor reading $z_0$. We can also set the initial estimation error covariance $P_0$ to be $0$ (we fully believe the initial measurement).
+    \begin{align*}
+        x_{e_0} &= z_0 = \SI{25.62}{\degreeCelsius} \\
+        P_{e_0} &= 0
+    \end{align*}
+    \item \texttt{Predict System State} \\
+    Using Equation~\eqref{eq:final-temp}, we can calculate the expected temperature $C$ when $\text{pot\_value} = 128$ and $T_{\text{ambient}} = \SI{27.5}{\degreeCelsius}$.
+    \begin{align*}
+        C &= T_{\text{ambient}} + R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Heat}}}{R_{\text{Heat}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}\right)^2}{R_{\text{Heat}}} \\
+        &= \SI{27.5}{\degreeCelsius} + 170 \cdot \frac{\left(3.3 \cdot \frac{560}{560 + 10000 \cdot \frac{128}{255}}\right)^2}{560} \\
+        &\approx \SI{27.53}{\degreeCelsius}
+    \end{align*}
+    Since $A=0$, the predicted state $x_{p_k}$ is simply equal to $C$.
+    \begin{align*}
+        x_{p_k} &= A x_{e_{k-1}} + C \\
+        x_{p_1} &= C \\
+                &\approx \SI{27.53}{\degreeCelsius}
+    \end{align*}
+    The predicted estimation error covariance $P_{p_k}$ is given by
+    \begin{align*}
+        P_{p_k} &= A P_{e_{k-1}} A^T + Q \\
+        P_{p_1} &= Q \\
+                &= \SI{0.0028}{\degreeCelsius^2}
+    \end{align*}
+    \item \texttt{Compute Kalman Gain} \\
+    The Kalman Gain $K_k$ is given by
+    \begin{align*}
+        K_k &= \frac{P_{p_k} H^T}{H P_{p_k} H^T + R} \\
+        K_1 &= \frac{P_{p_1}}{P_{p_1} + R} \\
+            &= \frac{\SI{0.0028}{\degreeCelsius^2}}{\SI{0.0028}{\degreeCelsius^2} + \SI{0.395}{\degreeCelsius^2}} \\
+            &\approx 0.007
+    \end{align*}
+    \item \texttt{Estimate System State} \\
+    The estimated state $x_{e_k}$ is given by
+    \begin{align*}
+        x_{e_k} &= x_{p_k} + K_k (z_k - H x_{p_k}) \\
+        x_{e_1} &= x_{p_1} + K_1 (z_1 - x_{p_1}) \\
+                &= \SI{27.53}{\degreeCelsius} + 0.007 (\SI{25.62}{\degreeCelsius} - \SI{27.53}{\degreeCelsius}) \\
+                &\approx \SI{27.52}{\degreeCelsius}
+    \end{align*}
+    The estimated estimation error covariance $P_{e_k}$ is given by
+    \begin{align*}
+        P_{e_k} &= P_{p_k} - K_k H P_{p_k} \\
+        P_{e_1} &= P_{p_1} - K_1 P_{p_1} \\
+                &= \SI{0.0028}{\degreeCelsius^2} - 0.007 \cdot \SI{0.0028}{\degreeCelsius^2} \\
+                &\approx \SI{0.00278}{\degreeCelsius^2}
+    \end{align*}
+\end{enumerate}
+
+Repeating the above steps for all 10 sensor readings (the full calculation is given in Appendix~\ref{app:kalman-filter}), we get the following filtered readings:
+\begin{align*}
+    x_{e_0} &= \SI{25.62}{\degreeCelsius} \\
+    x_{e_1} &= \SI{27.52}{\degreeCelsius} \\
+    x_{e_2} &= \SI{27.52}{\degreeCelsius} \\
+    x_{e_3} &= \SI{27.52}{\degreeCelsius} \\
+    x_{e_4} &= \SI{27.52}{\degreeCelsius} \\
+    x_{e_5} &= \SI{27.52}{\degreeCelsius} \\
+    x_{e_6} &= \SI{27.52}{\degreeCelsius} \\
+    x_{e_7} &= \SI{27.52}{\degreeCelsius} \\
+    x_{e_8} &= \SI{27.52}{\degreeCelsius} \\
+    x_{e_9} &= \SI{27.52}{\degreeCelsius}
+\end{align*}
+
+The ground truth temperature from the digital thermometer for all readings is approximately $\SI{27.65}{\degreeCelsius}$. We can then calculate the mean squared error (MSE) for both the raw sensor readings and the filtered readings using
+\begin{equation*}
+    \mathrm{MSE} = \frac{1}{N} \sum_{i=1}^{N} (y_i - \hat{y}_i)^2
+\end{equation*}
+where
+\begin{itemize}
+    \item $N=10$ for the 10 readings we took
+    \item $y_i$ is the ground truth temperature from the digital thermometer
+    \item $\hat{y}_i$ is either the raw sensor reading or the filtered reading
+\end{itemize}
+Calculating the MSE for the raw sensor readings, we get
+\begin{align*}
+    \mathrm{MSE}_{\text{raw}} &= \frac{1}{10} \left( (\SI{27.65}{\degreeCelsius} - \SI{25.62}{\degreeCelsius})^2 + (\SI{27.65}{\degreeCelsius} - \SI{25.62}{\degreeCelsius})^2 + \ldots + (\SI{27.65}{\degreeCelsius} - \SI{25.59}{\degreeCelsius})^2 \right) \\
+    &\approx \SI{4.129}{\degreeCelsius^2}
+\end{align*}
+Calculating the MSE for the filtered readings, we get
+\begin{align*}
+    \mathrm{MSE}_{\text{filtered}} &= \frac{1}{10} \left( (\SI{27.65}{\degreeCelsius} - \SI{25.62}{\degreeCelsius})^2 + (\SI{27.65}{\degreeCelsius} - \SI{27.52}{\degreeCelsius})^2 + \ldots + (\SI{27.65}{\degreeCelsius} - \SI{27.52}{\degreeCelsius})^2 \right) \\
+    &\approx \SI{0.4273}{\degreeCelsius^2}
+\end{align*}
+
+From the results, we can see that the MSE of the filtered readings is significantly lower than that of the raw sensor readings, indicating that the Kalman Filter has effectively improved the accuracy of the temperature measurements.
 
 \section{Conclusion}
+The adjustable voltage divider circuit was successfully implemented and mathematically modeled. All the necessary parameters for a Kalman filter were derived and utilized in the filtering process. The project progress include:
+\begin{itemize}
+\item Design and physical implementation of an adjustable voltage divider for temperature manipulation
+\item Derivation of the thermal and electrical relationships governing the system
+\item Experimental data collection for process and sensor noise estimation
+\item Determination of system and sensor covariance values for Kalman Filter tuning
+\item Demonstration of improved temperature measurement accuracy through Kalman filtering
+\end{itemize}
 
 
 \newpage
 \bibliographystyle{IEEEtran}
 \bibliography{ref}
+
+\newpage
+\appendix
+\section{Full Kalman Filter Calculation}
+\label{app:kalman-filter}
+Since $A=0$ and $H=1$, we can simplify the Kalman filter equations as follows:
+\begin{align*}
+    x_{p_k} &= C \\
+    P_{p_k} &= Q \\
+    K_k &= \frac{Q}{Q + R} \\
+    x_{e_k} &= x_{p_k} + K_k (z_k - x_{p_k}) \\
+    P_{e_k} &= P_{p_k} - K_k P_{p_k}
+\end{align*}
+We can see that $x_{p_k}$, $P_{p_k}$, $K_k$, and $P_{e_k}$ are constant for all $k$. We can calculate them once for $\text{pot\_value} = 128$ and $T_{\text{ambient}} = \SI{27.5}{\degreeCelsius}$ \\ $x_{p_k}$ is
+\begin{align*}
+    x_{p_k} &= C = T_{\text{ambient}} + R_{\text{th}} \cdot \frac{\left(V_s \cdot \frac{R_{\text{Heat}}}{R_{\text{Heat}} + R_{\text{Pot, Max}} \cdot \frac{\text{pot\_value}}{\text{pot\_value}_{\text{Max}}}}\right)^2}{R_{\text{Heat}}} \\
+        &= \SI{27.5}{\degreeCelsius} + 170 \cdot \frac{\left(3.3 \cdot \frac{560}{560 + 10000 \cdot \frac{128}{255}}\right)^2}{560} \\
+        x_{p_k} &\approx \SI{27.53}{\degreeCelsius} \\
+\end{align*}
+$P{p_k}$ is
+\begin{align*}
+    P_{p_k} &= Q = \SI{0.0028}{\degreeCelsius^2} \\
+\end{align*}
+$K_k$ is
+\begin{align*}
+    K_k &= \frac{Q}{Q + R} \\
+    &= \frac{\SI{0.0028}{\degreeCelsius^2}}{\SI{0.0028}{\degreeCelsius^2} + \SI{0.395}{\degreeCelsius^2}} \\
+    K_k &\approx 0.007
+\end{align*}
+and $P_{e_k}$ is
+\begin{align*}
+    P_{e_k} &= P_{p_k} - K_k P_{p_k} \\
+    &= \SI{0.0028}{\degreeCelsius^2} - 0.007 \cdot \SI{0.0028}{\degreeCelsius^2} \\
+    P_{e_k} &\approx \SI{0.00278}{\degreeCelsius^2}
+\end{align*}
+We can now calculate $x_{e_k}$ for each sensor reading $z_k$. \\
+For $k=1,2,3,4,6,7,8$, $z_k = \SI{25.62}{\degreeCelsius}$, so
+\begin{align*}
+    x_{e_k} &= x_{p_k} + K_k (z_k - x_{p_k}) \\
+    &= \SI{27.53}{\degreeCelsius} + 0.007 (\SI{25.62}{\degreeCelsius} - \SI{27.53}{\degreeCelsius}) \\
+    x_{e_k} &\approx \SI{27.52}{\degreeCelsius}
+\end{align*}
+For $k=5$, $z_5 = \SI{25.63}{\degreeCelsius}$, so
+\begin{align*}
+    x_{e_5} &= x_{p_5} + K_5 (z_5 - x_{p_5}) \\
+    &= \SI{27.53}{\degreeCelsius} + 0.007 (\SI{25.63}{\degreeCelsius} - \SI{27.53}{\degreeCelsius}) \\
+    x_{e_5} &\approx \SI{27.52}{\degreeCelsius}
+\end{align*}
+For $k=9$, $z_9 = \SI{25.59}{\degreeCelsius}$, so
+\begin{align*}
+    x_{e_9} &= x_{p_9} + K_9 (z_9 - x_{p_9}) \\
+    &= \SI{27.53}{\degreeCelsius} + 0.007 (\SI{25.59}{\degreeCelsius} - \SI{27.53}{\degreeCelsius}) \\
+    x_{e_9} &\approx \SI{27.52}{\degreeCelsius}
+\end{align*}
 
 \end{document}
