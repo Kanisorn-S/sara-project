@@ -6,9 +6,9 @@
 \usepackage{siunitx} 
 \usepackage{caption}
 \usepackage{geometry}
+\usepackage{hyperref}
 \usepackage{url}
 \usepackage{cite}
-\usepackage{hyperref}
 \usepackage{listings}
 \usepackage{listings-rust}
 \usepackage{xurl}
@@ -207,6 +207,7 @@ Since our sensor is measuring the temperature, which is the value we want to kno
 \subsubsection{Process Covariance $Q$}
 From Equation~\eqref{eq:q}, $Q$ is the covariance of our system process noise $w_k$. We can calculate this by taking multiple temperature measurements for multiple states of our system (multiple different $\text{pot\_value}$) using a trustworthy digital thermometer then finding the covariance using
 
+
 \begin{equation}
     \label{eq:cov}
     \mathrm{Cov}(X) = \frac{1}{N} \sum_{i=1}^{N} (X_i - \mu_X)^2
@@ -219,29 +220,50 @@ Twenty temperature measurements were recorded using a reliable digital thermomet
     \text{pot\_value} = 0, 17, 34, 51, 68, 85, 102, 119, 136, 153, 170, 187, 204, 221, 238, 255
 \end{equation}
 
-From the result in \ref{app:q}, we can find $Q$ by using Equation~\eqref{eq:cov}, which gives us
+From the result recorded in our \href{https://docs.google.com/spreadsheets/d/1mIqAQL7zom7rqrgY63SVOOFBYus10Tk0CKpmR08Oij0/edit?gid=0#gid=0}{\textbf{\underline{Google Sheet}}}
+, we can find $Q$ by using Equation~\eqref{eq:cov} for each $\text{pot\_value}$ setting, where 
 
+\begin{itemize}
+    \item $N=20$ for the 20 readings we took for each $\text{pot\_value}$
+    \item $X_i$ is each of the temperature reading from the \textbf{digital thermometer}
+    \item $\mu_X$ is the mean of the temperature readings from the \textbf{digital thermometer}
+\end{itemize}
+then finding the geometric average over all the $\text{pot\_value}$ using
+\begin{equation}
+    \label{eq:geo-avg}
+    \bar{x}_{\mathrm{geo}} = \left( \prod_{i=1}^{N} x_i \right)^{\tfrac{1}{N}}
+\end{equation}
+where
+\begin{itemize}
+    \item $N=16$ for the 16 different $\text{pot\_value}$ settings
+    \item $x_i$ is the covariance calculated using Equation~\eqref{eq:cov} for each $\text{pot\_value}$
+    \item $\bar{x}_{\mathrm{geo}}=Q$
+\end{itemize}
+This gives us
 \begin{align*}
-    Q = \mathrm{Cov}(T) &= \frac{1}{N} \sum_{i=1}^{N} (T_i - \mu_T)^2 \\
-    &= \frac{1}{320} \sum_{i=1}^{320} (T_i - \SI{26.53}{\degreeCelsius})^2 \\
-    &= 0.035
+    Q = \SI{0.0028}{\degreeCelsius^2}
 \end{align*}
 
 \subsubsection{Sensor Noise Covariance $R$}
-From Equation~\eqref{eq:r}, $R$ is the covariance of our sensor noise $v_k$. We can calculate this by taking multiple temperature measurements for multiple states of our system (multiple different $\text{pot\_value}$) using both a trustworthy digital thermometer and our temperature sensor then finding the covariance using
-
-\begin{equation}
-    \label{eq:cov-sensor}
-    \mathrm{Cov}(X) = \frac{1}{N} \sum_{i=1}^{N} (X_i - \mu_X)^2
-\end{equation}
-Where $\mu_X$ is the temperature read by the digital thermometer.
+From Equation~\eqref{eq:r}, $R$ is the covariance of our sensor noise $v_k$. We can calculate this by taking multiple temperature measurements for multiple states of our system (multiple different $\text{pot\_value}$) using both a trustworthy digital thermometer and our temperature sensor then finding the covariance using Equation~\eqref{eq:cov}.
 
 Twenty temperature measurements were recorded for each of the $\text{pot\_value}$ in~\eqref{eq:pot-value}
+From the result recorded in our \href{https://docs.google.com/spreadsheets/d/1mIqAQL7zom7rqrgY63SVOOFBYus10Tk0CKpmR08Oij0/edit?gid=501799072#gid=501799072}{\textbf{\underline{Google Sheet}}}, we can find $R$ by using Equation~\eqref{eq:cov} for each $\text{pot\_value}$ setting, where
 
-From the result in \ref{app:r}, we can find $R$ by using Equation~\eqref{eq:cov-sensor} for each $\text{pot\_value}$ setting then averaging over all the $\text{pot\_value}$. This gives us
-
+\begin{itemize}
+    \item $N=20$ for the 20 readings we took for each $\text{pot\_value}$
+    \item $X_i$ is each of the temperature reading from \textbf{our temperature sensor}
+    \item $\mu_X$ is the ground truth temperature reading from the \textbf{digital thermometer}
+\end{itemize}
+then finding the geometric average over all the $\text{pot\_value}$ using Equation~\eqref{eq:geo-avg}, where
+\begin{itemize}
+    \item $N=16$ for the 16 different $\text{pot\_value}$ settings
+    \item $x_i$ is the covariance calculated using Equation~\eqref{eq:cov} for each $\text{pot\_value}$
+    \item $\bar{x}_{\mathrm{geo}}=R$
+\end{itemize}
+This gives us
 \begin{align*}
-    R = 0.396
+    R = \SI{0.395}{\degreeCelsius^2}
 \end{align*}
 
 \section{Demonstration and Verification}
@@ -253,12 +275,4 @@ From the result in \ref{app:r}, we can find $R$ by using Equation~\eqref{eq:cov-
 \bibliographystyle{IEEEtran}
 \bibliography{ref}
 
-\newpage
-\appendix
-
-\section{\texorpdfstring{Temperature Measurement for Calculating the Process Covariance $Q$}{Temperature Measurement for Calculating the Process Covariance}}
-\label{app:q}
-
-\section{\texorpdfstring{Temperature Measurement for Calculating the Sensor Noise Covariance $R$}{Temperature Measurement for Calculating the Sensor Noise Covariance}}
-\label{app:r}
 \end{document}
