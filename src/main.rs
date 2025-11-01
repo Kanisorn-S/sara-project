@@ -29,7 +29,8 @@ const BETA: f32 = 4050.0;
 const V_S: f32 = 3.3;
 const R_REF: f32 = 10000.0;
 const R_0: f32 = 10000.0;
-const POT_VALUE: u8 = 0;
+// POT_VALUE: 0 is for MAX heat, 255 is MIN heat
+const POT_VALUE: u8 = 128;
 
 use embedded_hal::delay::DelayNs;
 // use stm32h7xx_hal::device::SPI2;
