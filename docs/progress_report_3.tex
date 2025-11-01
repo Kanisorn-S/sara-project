@@ -205,6 +205,14 @@ Since our sensor is measuring the temperature, which is the value we want to kno
 \end{equation*}
 
 \subsubsection{Process Covariance $Q$}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/measure_temp.jpg}
+    \caption{Measuring the temperature using a reliable digital thermometer placed near the thermistor}
+    \label{fig:measure-temp}
+\end{figure}
+
 From Equation~\eqref{eq:q}, $Q$ is the covariance of our system process noise $w_k$. We can calculate this by taking multiple temperature measurements for multiple states of our system (multiple different $\text{pot\_value}$) using a trustworthy digital thermometer then finding the covariance using
 
 
