@@ -33,8 +33,22 @@ const R_0: f32 = 10000.0;
 const POT_VALUE: u8 = 128;
 
 use embedded_hal::delay::DelayNs;
-// use stm32h7xx_hal::device::SPI2;
-// use stm32h7xx_hal::spi::{Enabled, Spi};
+
+// Mathematical Model for Control
+const T_AMBIENT: f32 = 27.5;
+const R_TH: f32 = 170f32;
+const R_HEAT: f32 = 560f32;
+const R_POT_MAX: f32 = 10_000f32;
+const POT_VALUE_MAX: f32 = 255f32;
+
+// Kalman Filter
+const _A: f32 = 0f32;
+const _H: f32 = 1f32;
+const Q: f32 = 0.0028;
+const R: f32 = 0.395;
+const _P_P: f32 = Q;
+const K: f32 = Q / (Q + R);
+const _P_E: f32 = _P_P - (K * _P_P);
 
 struct NoopDelay;
 impl DelayNs for NoopDelay {
@@ -155,6 +169,12 @@ fn main() -> ! {
             .device_class(usbd_serial::USB_CLASS_CDC)
             .build();
 
+    // Kalman Filter
+    let mut is_first_reading = true;
+    let mut z: f32;
+    let mut x_p: f32;
+    let mut x_e: f32;
+    let c: f32 = T_AMBIENT + (R_TH * (powf(V_S * (R_HEAT / (R_HEAT + R_POT_MAX * (POT_VALUE as f32 / POT_VALUE_MAX))), 2f32) / R_HEAT));
 
     loop {
         if !usb_dev.poll(&mut [&mut serial]) {
@@ -170,10 +190,18 @@ fn main() -> ! {
         let to_ln = ((V_S - 2f32 * v_buffer) * R_REF) / ((V_S + 2f32 * v_buffer) * R_0);
         let temp_k = powf((1f32 / T_0) + ((1f32 / BETA) * logf(to_ln)), -1f32);
 
-        let temp_c = temp_k - 273.15;
+        z = temp_k - 273.15;
+
+        if is_first_reading {
+            x_e = z;
+            is_first_reading = false;
+        } else {
+            x_p = c;
+            x_e = x_p + (K * (z - x_p));
+        }
 
         let mut m: String<32> = String::new();
-        write!(m, "Temperature: {:.2} C\r\n", temp_c).unwrap();
+        write!(m, "Temperature: {:.2} C\r\n", x_e).unwrap();
 
         match serial.write(m.as_bytes()) {
             _ => {}
