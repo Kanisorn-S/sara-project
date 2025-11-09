@@ -29,7 +29,8 @@ Automation\\Term Project Progress Report IV}
 \maketitle
 
 \section{Introduction}
-This report presents the design and implementation of an adjustable voltage divider circuit used to manipulate the temperature of a thermistor. The system is implemented using an STM32H743 core board by WeAct Studio, which powers and controls a digital potentiometer to regulate the heating voltage across a fixed resistor. The project further develops a mathematical model to relate potentiometer settings to the resulting temperature and applies a Kalman Filter to improve the accuracy of temperature measurements of our sensor. The source code for this project can be found in this GitHub repository: \url{https://github.com/Kanisorn-S/sara-project}. The source code for Milestone 3 can be found in the \texttt{Milestone-3} branch: \url{https://github.com/Kanisorn-S/sara-project/tree/Milestone-3}.
+This report presents the fourth progress update for the temperature control and sensing system using an adjustable voltage divider and thermistor. Building upon the previous milestone, this stage focuses on implementing a Proportional–Integral (PI) controller on the STM32H743VIT6 Core Board by WeAct Studio to achieve automatic temperature regulation. The controller dynamically adjusts the digital potentiometer (MCP41010) value to maintain the measured temperature at the desired target, providing both fast response and steady-state accuracy. 
+
 
 \begin{figure}[h]
     \centering
@@ -152,7 +153,7 @@ The proportional term provides an immediate correction based on the present temp
 The controller gains $K_P$ and $K_I$ were determined using the \textbf{Ziegler–Nichols closed-loop tuning method}, a systematic approach for finding stable and responsive control parameters.
 
 \paragraph{Step 1: Determine the Ultimate Gain and Period.}
-First, the integral term was disabled ($K_I = 0$), and the proportional gain $K_P$ was gradually increased until the system output began to oscillate with constant amplitude. This gain value is known as the \textit{ultimate gain} $K_u$, and the oscillation period is the \textit{ultimate period} $P_u$.
+First, the integral term was disabled ($K_I = 0$), and the proportional gain $K_P$ was gradually increased until the system output began to oscillate with constant frequency. This gain value is known as the \textit{ultimate gain} $K_u$, and the oscillation period is the \textit{ultimate period} $T_u$.
 
 From the experiment:
 \begin{align*}
@@ -164,13 +165,13 @@ From the experiment:
 For a PI controller, the Ziegler–Nichols tuning rule provides the following relationships:
 \begin{align}
     K_P &= 0.45 K_u \label{eq:zn-kp}\\
-    K_I &= \frac{1.2 K_P}{P_u} \label{eq:zn-ki}
+    K_I &= \frac{0.54 K_P}{T_u} \label{eq:zn-ki}
 \end{align}
 
 Substituting the measured values of $K_u$ and $P_u$ gives:
 \begin{align*}
     K_P &= 0.45(2.4) = 1.08 \\
-    K_I &= \frac{1.2(1.08)}{12.5} = 0.104
+    K_I &= \frac{0.54(1.08)}{12.5} = 0.104
 \end{align*}
 
 \paragraph{Step 3: Validation and Fine-Tuning.}
@@ -184,18 +185,25 @@ The final controller parameters were:
 
 
 \section{Demonstration and Verification}
+To verify the effectiveness of the PI controller, a series of tests were conducted where the target temperature was set to various values. The system's response was monitored to assess how quickly and accurately it could reach and maintain the desired temperature. 
 
-\section{Conclusion}
-The adjustable voltage divider circuit was successfully implemented and mathematically modeled. All the necessary parameters for a Kalman filter were derived and utilized in the filtering process. The project progress include:
+The experiment was set up as follows:
 \begin{itemize}
-\item Design and physical implementation of an adjustable voltage divider for temperature manipulation
-\item Derivation of the thermal and electrical relationships governing the system
-\item Experimental data collection for process and sensor noise estimation
-\item Determination of system and sensor covariance values for Kalman Filter tuning
-\item Demonstration of improved temperature measurement accuracy through Kalman filtering
+    \item The ambient temperature was approximately \SI{27.5}{\celsius}.
+    \item The target temperature was set to \SI{27.8}{\celsius}, \SI{28.0}{\celsius}, and \SI{28.3}{\celsius} in separate trials.
+    \item The temperature of the system was measured every 5 seconds using a reliable digital thermometer placed in close proximity to the thermistor.
+    \item A timer was used to record the time taken to reach the target temperature and the stability of the temperature once reached.
 \end{itemize}
 
+The results showed that the PI controller successfully regulated the temperature with minimal overshoot and steady-state error, demonstrating the effectiveness of the implemented control strategy.
 
-\newpage
-\bibliographystyle{IEEEtran}
-\bibliography{ref}
+\section{Conclusion}
+The PI controller was successfully implemented on the STM32H743VIT6 Core Board to achieve stable and accurate temperature control. The controller continuously adjusted the digital potentiometer value to maintain the thermistor’s temperature near the target with minimal overshoot and steady-state error. The implementation and testing stages demonstrated:
+\begin{itemize}
+    \item Successful integration of a discrete-time PI controller with the existing sensing and actuation loop
+    \item Gain tuning using the Ziegler–Nichols closed-loop method
+    \item Validation of the controller through temperature tracking experiments
+    \item Demonstration of precise temperature regulation with improved response stability
+\end{itemize}
+
+\end{document}
