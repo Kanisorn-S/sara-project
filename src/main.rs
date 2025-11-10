@@ -18,7 +18,7 @@ use core::fmt::Write;
 use cortex_m::asm::nop;
 use heapless::String;
 
-use libm::{powf, logf};
+use libm::{powf, logf, roundf};
 
 use panic_halt as _;
 
@@ -30,12 +30,12 @@ const V_S: f32 = 3.3;
 const R_REF: f32 = 10000.0;
 const R_0: f32 = 10000.0;
 // POT_VALUE: 0 is for MAX heat, 255 is MIN heat
-const POT_VALUE: u8 = 128;
+const POT_VALUE: u8 = 255;
 
 use embedded_hal::delay::DelayNs;
 
 // Mathematical Model for Control
-const T_AMBIENT: f32 = 27.5;
+const T_AMBIENT: f32 = 26.5;
 const R_TH: f32 = 170f32;
 const R_HEAT: f32 = 560f32;
 const R_POT_MAX: f32 = 10_000f32;
@@ -51,12 +51,12 @@ const K: f32 = Q / (Q + R);
 const _P_E: f32 = _P_P - (K * _P_P);
 
 // PI Controller
-const KP: f32 = 3.0;
-const KI: f32 = 0.1;
+const KP: f32 = 1_750.0;
+const KI: f32 = 5.0;
 const DT: f32 = 0.5;     // Control loop time in seconds (since delay is 500 ms)
 const POT_MIN: u8 = 0;   // Fully ON (max heat)
 const POT_MAX: u8 = 255; // Fully OFF (min heat)
-const TARGET_TEMP: f32 = 27.5;
+const TARGET_TEMP: f32 = 26.6;
 
 struct NoopDelay;
 impl DelayNs for NoopDelay {
@@ -182,9 +182,10 @@ fn main() -> ! {
     let mut z: f32;
     let mut x_p: f32;
     let mut x_e: f32;
-    let c: f32 = T_AMBIENT + (R_TH * (powf(V_S * (R_HEAT / (R_HEAT + R_POT_MAX * (POT_VALUE as f32 / POT_VALUE_MAX))), 2f32) / R_HEAT));
+    let mut c: f32 = T_AMBIENT + (R_TH * (powf(V_S * (R_HEAT / (R_HEAT + R_POT_MAX * (POT_VALUE as f32 / POT_VALUE_MAX))), 2f32) / R_HEAT));
 
     // PI Controller state
+    // let mut old_pot_value = POT_VALUE as f32;
     let mut integral: f32 = 0.0;
     let mut pot_output: u8;
 
@@ -212,16 +213,15 @@ fn main() -> ! {
             x_e = x_p + (K * (z - x_p));
         }
 
+        // Round for sensor precision (to 2 decimal points)
+        x_e = roundf(x_e * 100f32) / 100f32;
+
         // let mut m: String<32> = String::new();
         // write!(m, "Temperature: {:.2} C\r\n", x_e).unwrap();
 
         // === PI CONTROLLER ===
         let error = TARGET_TEMP - x_e;
         integral += error * DT;
-
-        // Anti-windup clamp
-        if integral > 100.0 { integral = 100.0; }
-        if integral < -100.0 { integral = -100.0; }
 
         let control_signal = KP * error + KI * integral;
 
@@ -231,7 +231,15 @@ fn main() -> ! {
         if new_pot_value < POT_MIN as f32 { new_pot_value = POT_MIN as f32; }
         if new_pot_value > POT_MAX as f32 { new_pot_value = POT_MAX as f32; }
 
+        // if new_pot_value > POT_MAX as f32 || new_pot_value < POT_MIN as f32 {
+        //     pot_output = old_pot_value as u8;
+        // } else {
+        //     pot_output = new_pot_value as u8;
+        //     old_pot_value = new_pot_value;
+        // }
+
         pot_output = new_pot_value as u8;
+        c = T_AMBIENT + (R_TH * (powf(V_S * (R_HEAT / (R_HEAT + R_POT_MAX * (pot_output as f32 / POT_VALUE_MAX))), 2f32) / R_HEAT));
 
         // Apply new potentiometer position
         mcp41x.set_position(Channel::Ch0, pot_output).unwrap();
@@ -240,8 +248,8 @@ fn main() -> ! {
         let mut m: String<64> = String::new();
         write!(
             m,
-            "Temp: {:.2} C | Err: {:.2} | Pot: {} | Ctrl: {:.2}\r\n",
-            x_e, error, pot_output, control_signal
+            "Temp: {:.2} C | Err: {:.2} | Pot: {:.2} | Int: {:.2}\r\n",
+            x_e, error, pot_output, integral
         ).unwrap();
 
         match serial.write(m.as_bytes()) {
