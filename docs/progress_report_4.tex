@@ -82,21 +82,6 @@ The controller then updates the potentiometer value $\text{pot\_value}$ as:
 \end{equation}
 The subtraction in Equation~\eqref{eq:pot-update} ensures negative feedback: when the temperature is below the target (positive error), $u[k]$ becomes positive, thus decreasing $\text{pot\_value}$ to increase the heater voltage and raise the temperature. Conversely, when the temperature exceeds the target (negative error), $u[k]$ becomes negative, increasing $\text{pot\_value}$ to lower the heater voltage and reduce the temperature.
 
-% \subsection{Integral Windup Prevention}
-
-% A common issue in PI controllers is \textit{integral windup}, which occurs when the integral term accumulates excessively during actuator saturation. To mitigate this, the integral sum was clamped to a predefined limit:
-% \begin{equation}
-%     \text{integral} = 
-%     \begin{cases}
-%         I_{\text{max}}, & \text{if } \text{integral} > I_{\text{max}} \\
-%         I_{\text{min}}, & \text{if } \text{integral} < I_{\text{min}} \\
-%         \text{integral}, & \text{otherwise}
-%     \end{cases}
-%     \label{eq:anti-windup}
-% \end{equation}
-% where $I_{\text{max}}$ and $I_{\text{min}}$ are experimentally determined bounds that ensure system stability while preserving responsiveness.
-
-
 \subsection{Implementation}
 
 \subsubsection{Code Integration}
@@ -136,7 +121,7 @@ loop {
     let control_signal = KP * error + KI * integral;
 
     // 5. Update potentiometer value 
-    pot_value = pot_value - control_signal;
+    pot_value = POT_VALUE_MAX - control_signal;
     pot_value = pot_value.clamp(0.0, 255.0);
 
     // 6. Send the new value to MCP41010 
@@ -150,28 +135,42 @@ The proportional term provides an immediate correction based on the present temp
 
 \subsubsection{Tuning}
 
-The controller gains $K_P$ and $K_I$ were determined using the \textbf{Ziegler–Nichols closed-loop tuning method}, a systematic approach for finding stable and responsive control parameters.
+The controller gains $K_P$ and $K_I$ were determined experimentally through trial and error.
 
-\paragraph{Step 1: Determine the Ultimate Gain and Period.}
-First, the integral term was disabled ($K_I = 0$), and the proportional gain $K_P$ was gradually increased until the system output began to oscillate with constant frequency. This gain value is known as the \textit{ultimate gain} $K_u$, and the oscillation period is the \textit{ultimate period} $T_u$.
+\paragraph{Step 1: Determine the Proportional Gain.}
 
-From the experiment:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/on_off.jpg}
+    \caption{System output oscillating with high proportional gain, resembling an on-off controller.}
+    \label{fig:on-off}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/steady_state.jpg}
+    \caption{System output reaching a steady state error with reduced proportional gain.}
+    \label{fig:steady-state}
+\end{figure}
+
+First, the integral term was disabled ($K_I = 0$), and the proportional gain $K_P$ was gradually increased until the system output began to oscillate, essentially becoming an on-off controller, as shown in Figure~\ref{fig:on-off}. The proportional gain is then lowered until we get a steady state error, as shown in Figure~\ref{fig:steady-state}.
+
+From the experiment, our PI controller began to oscillate at:
 \begin{align*}
-    K_u &= 2.4 \\
-    P_u &= 12.5~\text{s}
+    K_P &= 2100.0 \\
 \end{align*}
 
-\paragraph{Step 2: Apply Ziegler–Nichols Formula.}
-For a PI controller, the Ziegler–Nichols tuning rule provides the following relationships:
-\begin{align}
-    K_P &= 0.45 K_u \label{eq:zn-kp}\\
-    K_I &= \frac{0.54 K_P}{T_u} \label{eq:zn-ki}
-\end{align}
-
-Substituting the measured values of $K_u$ and $P_u$ gives:
+Therefore, we lowered $K_P$ to:
 \begin{align*}
-    K_P &= 0.45(2.4) = 1.08 \\
-    K_I &= \frac{0.54(1.08)}{12.5} = 0.104
+    K_P &= 1850.0
+\end{align*}
+
+\paragraph{Step 2: Determine the Integral Gain.}
+After setting $K_P=1850.0$, we enabled the integral term and gradually increased $K_I$ until the steady-state error was eliminated, and the system reached the target temperature without oscillation. 
+
+From the experiment, the integral gain was set to:
+\begin{align*}
+    K_I &= 5.0
 \end{align*}
 
 \paragraph{Step 3: Validation and Fine-Tuning.}
@@ -185,14 +184,12 @@ The final controller parameters were:
 
 
 \section{Demonstration and Verification}
-To verify the effectiveness of the PI controller, a series of tests were conducted where the target temperature was set to various values. The system's response was monitored to assess how quickly and accurately it could reach and maintain the desired temperature. 
+To verify the effectiveness of the PI controller, a series of tests were conducted where the target temperature was set to various values. The system's response was monitored to assess whether it could reach and maintain the desired temperature. 
 
 The experiment was set up as follows:
 \begin{itemize}
-    \item The ambient temperature was approximately \SI{27.5}{\celsius}.
-    \item The target temperature was set to \SI{27.8}{\celsius}, \SI{28.0}{\celsius}, and \SI{28.3}{\celsius} in separate trials.
-    \item The temperature of the system was measured every 5 seconds using a reliable digital thermometer placed in close proximity to the thermistor.
-    \item A timer was used to record the time taken to reach the target temperature and the stability of the temperature once reached.
+    \item The ambient temperature was approximately \SI{25.8}{\celsius}.
+    \item The target temperature was set to \SI{25.9}{\celsius}, \SI{26.0}{\celsius}, and \SI{26.1}{\celsius} in separate trials.
 \end{itemize}
 
 The results showed that the PI controller successfully regulated the temperature with minimal overshoot and steady-state error, demonstrating the effectiveness of the implemented control strategy.
