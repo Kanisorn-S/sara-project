@@ -29,7 +29,7 @@ Automation\\Term Project Progress Report IV}
 \maketitle
 
 \section{Introduction}
-This report presents the fourth progress update for the temperature control and sensing system using an adjustable voltage divider and thermistor. Building upon the previous milestone, this stage focuses on implementing a Proportional–Integral (PI) controller on the STM32H743VIT6 Core Board by WeAct Studio to achieve automatic temperature regulation. The controller dynamically adjusts the digital potentiometer (MCP41010) value to maintain the measured temperature at the desired target, providing both fast response and steady-state accuracy. 
+This report presents the fourth progress update for the temperature control and sensing system using an adjustable voltage divider and thermistor. Building upon the previous milestone, this stage focuses on implementing a Proportional–Integral (PI) controller on the STM32H743VIT6 Core Board by WeAct Studio to achieve automatic temperature regulation. The controller dynamically adjusts the digital potentiometer (MCP41010) value to maintain the measured temperature at the desired target.
 
 
 \begin{figure}[h]
@@ -64,7 +64,7 @@ and the accumulation of past errors. The controller output is given by
 \end{equation}
 where $K_P$ and $K_I$ are the proportional and integral gains, respectively.
 
-The proportional term $K_P e(t)$ provides an immediate correction proportional to the current error, giving the system fast response. The integral term $K_I \int e(t)\,dt$ eliminates the steady-state error by accumulating the past deviation from the target temperature, ensuring the system converges exactly to $T_{\text{set}}$ over time.
+The proportional term $K_P e(t)$ provides an immediate correction proportional to the current error. The integral term $K_I \int e(t)\,dt$ eliminates the steady-state error by accumulating the past deviation from the target temperature, ensuring the system converges to $T_{\text{set}}$ over time.
 
 \subsubsection{Discretization}
 
@@ -80,7 +80,7 @@ The controller then updates the potentiometer value $\text{pot\_value}$ as:
     \text{pot\_value}_{\text{new}} = \text{POT\_VALUE} - u[k]
     \label{eq:pot-update}
 \end{equation}
-The subtraction in Equation~\eqref{eq:pot-update} ensures negative feedback: when the temperature is below the target (positive error), $u[k]$ becomes positive, thus decreasing $\text{pot\_value}$ to increase the heater voltage and raise the temperature. Conversely, when the temperature exceeds the target (negative error), $u[k]$ becomes negative, increasing $\text{pot\_value}$ to lower the heater voltage and reduce the temperature.
+The subtraction in Equation~\eqref{eq:pot-update} ensures correct adjustments: when the temperature is below the target (positive error), $u[k]$ becomes positive, thus decreasing $\text{pot\_value}$ to increase the heater voltage and raise the temperature. Conversely, when the temperature exceeds the target (negative error), $u[k]$ becomes negative, increasing $\text{pot\_value}$ to lower the heater voltage and reduce the temperature. Since we start with $\text{pot\_value}=\text{POT\_VALUE\_MAX}$, if the temperature is above the target, the controller will turn off the heater by setting the potentiometer to its maximum value.
 
 \subsection{Implementation}
 
@@ -131,8 +131,6 @@ loop {
 }
 \end{lstlisting}
 
-The proportional term provides an immediate correction based on the present temperature error, while the integral term accumulates the past errors to eliminate long-term bias. The subtraction in the potentiometer update ensures proper negative feedback: when the measured temperature is below the target, the controller reduces the potentiometer value, increasing heater power to raise the temperature.  
-
 \subsubsection{Tuning}
 
 The controller gains $K_P$ and $K_I$ were determined experimentally through trial and error.
@@ -174,33 +172,39 @@ From the experiment, the integral gain was set to:
 \end{align*}
 
 \paragraph{Step 3: Validation and Fine-Tuning.}
-After applying these initial parameters, the system was tested under various target temperature settings. Small manual adjustments were made to slightly reduce $K_P$ (to 1.0) and $K_I$ (to 0.09) to minimize overshoot and improve stability without increasing settling time.
+After applying these initial parameters, the system was tested under various target temperature settings. Manual adjustments were made to reduce $K_P$ to 1750.0 to minimize overshoot and improve stability. 
 
 The final controller parameters were:
 \begin{align*}
-    K_P &= 1.0 \\
-    K_I &= 0.09
+    K_P &= 1750.0 \\
+    K_I &= 5.0
 \end{align*}
 
 
 \section{Demonstration and Verification}
-To verify the effectiveness of the PI controller, a series of tests were conducted where the target temperature was set to various values. The system's response was monitored to assess whether it could reach and maintain the desired temperature. 
+To verify the effectiveness of the PI controller, a test was conducted where a target temperature was set and the system's response was monitored to assess whether it could reach and maintain the desired temperature. 
 
 The experiment was set up as follows:
 \begin{itemize}
-    \item The ambient temperature was approximately \SI{25.8}{\celsius}.
-    \item The target temperature was set to \SI{25.9}{\celsius}, \SI{26.0}{\celsius}, and \SI{26.1}{\celsius} in separate trials.
+    \item The ambient temperature was approximately \SI{26.5}{\celsius}.
+    \item The target temperature was set to \SI{26.6}{\celsius}
 \end{itemize}
 
-The results showed that the PI controller successfully regulated the temperature with minimal overshoot and steady-state error, demonstrating the effectiveness of the implemented control strategy.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/result.jpg}
+    \caption{Temperature response of the system under PI control.}
+    \label{fig:result}
+\end{figure}
+
+The results, as shown in Figure~\ref{fig:result} showed that the PI controller successfully control the temperature of the system to reach and oscillate around the target temperature of \SI{26.6}{\celsius} with some overshoot and steady-state error. 
 
 \section{Conclusion}
-The PI controller was successfully implemented on the STM32H743VIT6 Core Board to achieve stable and accurate temperature control. The controller continuously adjusted the digital potentiometer value to maintain the thermistor’s temperature near the target with minimal overshoot and steady-state error. The implementation and testing stages demonstrated:
+The PI controller was successfully implemented on the STM32H743VIT6 Core Board to achieve stable and accurate temperature control. The controller continuously adjusted the digital potentiometer value to maintain the thermistor’s temperature near the target with some overshoot and steady-state error. The implementation and testing stages demonstrated:
 \begin{itemize}
     \item Successful integration of a discrete-time PI controller with the existing sensing and actuation loop
-    \item Gain tuning using the Ziegler–Nichols closed-loop method
+    \item Gain tuning via experimental trial and error
     \item Validation of the controller through temperature tracking experiments
-    \item Demonstration of precise temperature regulation with improved response stability
 \end{itemize}
 
 \end{document}
