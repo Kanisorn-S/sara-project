@@ -104,7 +104,7 @@ let mut pot_value: f32 = 0f32;
 // Main control loop
 loop {
     // 1. Get the current temperature from our 
-    temperature sensor and Kalman filter
+    // temperature sensor and Kalman filter
     let data: u32 = adc1.read(&mut channel).unwrap();
 
     // Kalman filter ...
@@ -112,7 +112,7 @@ loop {
     x_e = x_p + (K * (z - x_p));
 
     // 2. Compute instantaneous error
-    let error = TARGET_TEMP - current_temp;
+    let error = TARGET_TEMP - x_e;
 
     // 3. Update integral term 
     integral += error * SAMPLE_PERIOD;
